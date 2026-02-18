@@ -98,6 +98,20 @@ func (t *TextReporter) Write(w io.Writer, rr model.RunReport) error {
 			}
 		}
 
+		// Print incognito indicators
+		if len(dbr.IncognitoIndicators) > 0 {
+			fmt.Fprintf(w, "\n  POSSIBLE INCOGNITO VISITS (%d):\n", len(dbr.IncognitoIndicators))
+			fmt.Fprintf(w, "    (URLs found in Favicons DB but absent from History)\n")
+			for _, ind := range dbr.IncognitoIndicators {
+				fmt.Fprintf(w, "    %s\n", truncate(ind.URL, 100))
+				for _, d := range ind.Decoded {
+					for k, val := range d.Data {
+						fmt.Fprintf(w, "      %s.%s: %s\n", d.Decoder, k, val)
+					}
+				}
+			}
+		}
+
 		// Print decoded search queries
 		var searches []model.Visit
 		for _, v := range dbr.Visits {

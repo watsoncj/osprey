@@ -28,14 +28,24 @@ type Flag struct {
 	Source   string `json:"source"` // "url", "title", or "decoded"
 }
 
+// IncognitoIndicator represents a URL found in the Favicons database
+// but absent from History, suggesting it was visited in incognito mode.
+type IncognitoIndicator struct {
+	URL     string       `json:"url"`
+	Browser string       `json:"browser"`
+	DBPath  string       `json:"db_path"` // path to the Favicons DB
+	Decoded []DecodedURL `json:"decoded,omitempty"`
+}
+
 // DBReport is the analysis result for a single browser history database.
 type DBReport struct {
-	Browser string    `json:"browser"`
-	DBPath  string    `json:"db_path"`
-	Cutoff  time.Time `json:"cutoff"`
-	Visits  []Visit   `json:"visits"`
-	Summary DBSummary `json:"summary"`
-	Error   string    `json:"error,omitempty"`
+	Browser             string               `json:"browser"`
+	DBPath              string               `json:"db_path"`
+	Cutoff              time.Time            `json:"cutoff"`
+	Visits              []Visit              `json:"visits"`
+	Summary             DBSummary            `json:"summary"`
+	IncognitoIndicators []IncognitoIndicator `json:"incognito_indicators,omitempty"`
+	Error               string               `json:"error,omitempty"`
 }
 
 // DBSummary provides aggregate statistics for a database.

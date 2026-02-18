@@ -17,7 +17,7 @@ func (b *BingSearch) Match(rawURL string) bool {
 		return false
 	}
 	host := strings.ToLower(u.Hostname())
-	return (strings.Contains(host, "bing.com") && u.Path == "/search" && u.Query().Has("q"))
+	return strings.Contains(host, "bing.com") && strings.HasSuffix(u.Path, "/search") && u.Query().Has("q")
 }
 
 func (b *BingSearch) Decode(rawURL string) (model.DecodedURL, bool) {

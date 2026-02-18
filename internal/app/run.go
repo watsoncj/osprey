@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"os"
+	"path/filepath"
 	"sort"
 	"time"
 
@@ -103,7 +105,103 @@ func processDB(ctx context.Context, b Browser, path string, cutoff time.Time, de
 
 	dbr.Visits = visits
 	dbr.Summary = buildSummary(visits)
+	dbr.IncognitoIndicators = detectIncognito(ctx, path, b.Name(), dec)
 	return dbr
+}
+
+// chromiumBrowsers is the set of browsers that use a Chromium-style Favicons DB.
+var chromiumBrowsers = map[string]bool{
+	"Chrome": true,
+	"Edge":   true,
+	"Brave":  true,
+}
+
+// detectIncognito cross-references the Favicons database against the History
+// database for Chromium-based browsers. URLs present in icon_mapping but absent
+// from the urls table suggest visits made in incognito/private mode, because
+// Chromium sometimes writes favicon entries even during incognito sessions.
+func detectIncognito(ctx context.Context, historyPath string, browserName string, dec *decoder.Registry) []model.IncognitoIndicator {
+	if !chromiumBrowsers[browserName] {
+		return nil
+	}
+
+	faviconPath := filepath.Join(filepath.Dir(historyPath), "Favicons")
+	if _, err := os.Stat(faviconPath); err != nil {
+		return nil
+	}
+
+	fdb, err := sqliteio.OpenReadonly(ctx, faviconPath)
+	if err != nil {
+		log.Printf("Incognito detection: failed to open %s: %v", faviconPath, err)
+		return nil
+	}
+	defer fdb.Close()
+
+	hdb, err := sqliteio.OpenReadonly(ctx, historyPath)
+	if err != nil {
+		return nil
+	}
+	defer hdb.Close()
+
+	// Collect all page URLs from favicon icon_mapping.
+	const faviconQuery = `SELECT DISTINCT page_url FROM icon_mapping`
+	rows, err := fdb.QueryContext(ctx, faviconQuery)
+	if err != nil {
+		log.Printf("Incognito detection: favicon query failed: %v", err)
+		return nil
+	}
+	defer rows.Close()
+
+	var faviconURLs []string
+	for rows.Next() {
+		var u string
+		if err := rows.Scan(&u); err != nil {
+			continue
+		}
+		faviconURLs = append(faviconURLs, u)
+	}
+	if err := rows.Err(); err != nil {
+		return nil
+	}
+
+	if len(faviconURLs) == 0 {
+		return nil
+	}
+
+	// Build a set of all known history URLs for fast lookup.
+	const historyQuery = `SELECT url FROM urls`
+	hrows, err := hdb.QueryContext(ctx, historyQuery)
+	if err != nil {
+		return nil
+	}
+	defer hrows.Close()
+
+	historyURLs := make(map[string]bool)
+	for hrows.Next() {
+		var u string
+		if err := hrows.Scan(&u); err != nil {
+			continue
+		}
+		historyURLs[u] = true
+	}
+
+	var indicators []model.IncognitoIndicator
+	for _, u := range faviconURLs {
+		if !historyURLs[u] {
+			ind := model.IncognitoIndicator{
+				URL:     u,
+				Browser: browserName,
+				DBPath:  faviconPath,
+				Decoded: dec.DecodeAll(u),
+			}
+			indicators = append(indicators, ind)
+		}
+	}
+
+	if len(indicators) > 0 {
+		log.Printf("Incognito detection: found %d favicon-only URL(s) in %s", len(indicators), faviconPath)
+	}
+	return indicators
 }
 
 func buildSummary(visits []model.Visit) model.DBSummary {
