@@ -30,20 +30,24 @@ func All() []Browser {
 
 // --- Chromium shared query helper ---
 
-var chromiumEpoch = time.Date(1601, 1, 1, 0, 0, 0, 0, time.UTC)
+// Chromium stores timestamps as microseconds since 1601-01-01 UTC.
+// The SQL query converts to Unix seconds by dividing by 1e6 and subtracting
+// 11644473600 (seconds between 1601-01-01 and the Unix epoch 1970-01-01).
 
 func chromiumQuery(ctx context.Context, db *sql.DB, cutoff time.Time, browserName string) ([]model.Visit, error) {
-	chromiumCutoff := cutoff.Sub(chromiumEpoch).Microseconds()
+	cutoffUnix := cutoff.Unix()
 
 	const q = `
-		SELECT u.url, COALESCE(u.title, ''), v.visit_time
+		SELECT u.url, COALESCE(u.title, ''),
+		       v.visit_time / 1000000 - 11644473600 AS unix_sec,
+		       v.visit_time % 1000000 AS micro_frac
 		FROM visits v
 		JOIN urls u ON v.url = u.id
-		WHERE v.visit_time >= ?
+		WHERE (v.visit_time / 1000000 - 11644473600) >= ?
 		ORDER BY v.visit_time DESC
 	`
 
-	rows, err := db.QueryContext(ctx, q, chromiumCutoff)
+	rows, err := db.QueryContext(ctx, q, cutoffUnix)
 	if err != nil {
 		return nil, err
 	}
@@ -52,11 +56,11 @@ func chromiumQuery(ctx context.Context, db *sql.DB, cutoff time.Time, browserNam
 	var visits []model.Visit
 	for rows.Next() {
 		var urlStr, title string
-		var visitTime int64
-		if err := rows.Scan(&urlStr, &title, &visitTime); err != nil {
+		var unixSec, microFrac int64
+		if err := rows.Scan(&urlStr, &title, &unixSec, &microFrac); err != nil {
 			return nil, err
 		}
-		t := chromiumEpoch.Add(time.Duration(visitTime) * time.Microsecond)
+		t := time.Unix(unixSec, microFrac*1000)
 		visits = append(visits, model.Visit{
 			Time:    t,
 			URL:     urlStr,

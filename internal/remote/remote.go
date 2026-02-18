@@ -28,7 +28,7 @@ type Options struct {
 	KeyFile        string // path to private key (optional if agent is available)
 	Password       string // password auth fallback
 	AcceptHostKey  bool   // skip host key verification
-	Hours          float64
+	Lookback       time.Duration
 }
 
 const agentFilename = "bf-agent.exe"
@@ -52,7 +52,7 @@ func RunScan(ctx context.Context, opts Options) (model.RunReport, error) {
 
 	log.Printf("Agent deployed to %s:%s", opts.Host, agentPath)
 
-	report, err := executeAgent(ctx, client, agentPath, opts.Hours)
+	report, err := executeAgent(ctx, client, agentPath, opts.Lookback)
 	if err != nil {
 		return model.RunReport{}, fmt.Errorf("execute agent: %w", err)
 	}
@@ -191,22 +191,23 @@ func deployAgent(client *ssh.Client) (string, error) {
 }
 
 func removeAgent(client *ssh.Client, agentPath string) {
-	session, err := client.NewSession()
+	sftpClient, err := sftp.NewClient(client)
 	if err != nil {
-		log.Printf("Warning: could not create session to clean up agent: %v", err)
+		log.Printf("Warning: could not create SFTP session to clean up agent: %v", err)
 		return
 	}
-	defer session.Close()
+	defer sftpClient.Close()
 
-	cmd := fmt.Sprintf(`del /f "%s"`, agentPath)
-	if err := session.Run(cmd); err != nil {
+	// Convert Windows path back to SFTP path.
+	sftpPath := "/" + agentPath
+	if err := sftpClient.Remove(sftpPath); err != nil {
 		log.Printf("Warning: could not remove remote agent: %v", err)
 	} else {
 		log.Printf("Cleaned up remote agent")
 	}
 }
 
-func executeAgent(ctx context.Context, client *ssh.Client, agentPath string, hours float64) (model.RunReport, error) {
+func executeAgent(ctx context.Context, client *ssh.Client, agentPath string, lookback time.Duration) (model.RunReport, error) {
 	session, err := client.NewSession()
 	if err != nil {
 		return model.RunReport{}, err
@@ -217,7 +218,7 @@ func executeAgent(ctx context.Context, client *ssh.Client, agentPath string, hou
 	session.Stdout = &stdout
 	session.Stderr = &stderr
 
-	cmd := fmt.Sprintf(`"%s" -format json -hours %g`, agentPath, hours)
+	cmd := fmt.Sprintf(`"%s" -format json -lookback %s`, agentPath, lookback)
 	log.Printf("Executing: %s", cmd)
 
 	done := make(chan error, 1)

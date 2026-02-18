@@ -5,15 +5,15 @@ func defaultCategories() map[string][]string {
 		"adult_content": {
 			"pornhub", "xvideos", "xnxx", "xhamster", "redtube",
 			"youporn", "brazzers", "onlyfans", "chaturbate",
-			"pornographic", "nsfw", "xxx ",
+			"pornographic", "nsfw", "xxx ", "playboy",
 		},
 		"violence": {
-			"gore", "bestgore", "liveleak", "theync",
+			"bestgore", "liveleak", "theync",
 			"graphic violence", "execution video", "snuff",
-			"school shooting", "mass shooting",
+			"school shooting", "mass shooting", "sniper", "assault rifle",
 		},
 		"bullying": {
-			"cyberbullying", "kill yourself", "kys",
+			"cyberbullying", "kill yourself",
 			"you should die", "nobody likes you",
 			"go die", "end your life",
 		},

@@ -41,6 +41,35 @@ func (t *TextReporter) Write(w io.Writer, rr model.RunReport) error {
 			}
 		}
 
+		// Print YouTube video summary
+		type ytEntry struct {
+			time  string
+			id    string
+			title string
+		}
+		var ytVideos []ytEntry
+		for _, v := range dbr.Visits {
+			for _, d := range v.Decoded {
+				if d.Decoder == "youtube" && d.Kind == "video" {
+					ytVideos = append(ytVideos, ytEntry{
+						time:  v.Time.Format("2006-01-02 15:04:05"),
+						id:    d.Data["video_id"],
+						title: d.Data["title"],
+					})
+				}
+			}
+		}
+		if len(ytVideos) > 0 {
+			fmt.Fprintf(w, "\n  YOUTUBE VIDEOS (%d):\n", len(ytVideos))
+			for _, yt := range ytVideos {
+				if yt.title != "" {
+					fmt.Fprintf(w, "    [%s] %s (%s)\n", yt.time, yt.title, yt.id)
+				} else {
+					fmt.Fprintf(w, "    [%s] %s\n", yt.time, yt.id)
+				}
+			}
+		}
+
 		// Print flagged visits
 		var flagged []model.Visit
 		for _, v := range dbr.Visits {
@@ -52,7 +81,7 @@ func (t *TextReporter) Write(w io.Writer, rr model.RunReport) error {
 		if len(flagged) > 0 {
 			fmt.Fprintf(w, "\n  FLAGGED ITEMS:\n")
 			for _, v := range flagged {
-				fmt.Fprintf(w, "    [%s] %s\n", v.Time.Format("15:04:05"), truncate(v.URL, 100))
+				fmt.Fprintf(w, "    [%s] %s\n", v.Time.Format("2006-01-02 15:04:05"), truncate(v.URL, 100))
 				if v.Title != "" {
 					fmt.Fprintf(w, "      Title: %s\n", truncate(v.Title, 80))
 				}
@@ -80,9 +109,11 @@ func (t *TextReporter) Write(w io.Writer, rr model.RunReport) error {
 			fmt.Fprintf(w, "\n  DECODED URLS (unflagged):\n")
 			for _, v := range searches {
 				for _, d := range v.Decoded {
+					var parts []string
 					for k, val := range d.Data {
-						fmt.Fprintf(w, "    [%s] %s.%s: %s\n", v.Time.Format("15:04:05"), d.Decoder, k, val)
+						parts = append(parts, fmt.Sprintf("%s=%s", k, val))
 					}
+					fmt.Fprintf(w, "    [%s] %s: %s\n", v.Time.Format("2006-01-02 15:04:05"), d.Decoder, strings.Join(parts, ", "))
 				}
 			}
 		}

@@ -1,11 +1,18 @@
 package decoder
 
 import (
+	"encoding/json"
+	"fmt"
+	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/browser-forensics/browser-forensics/internal/model"
 )
+
+var ytHTTPClient = &http.Client{Timeout: 5 * time.Second}
+var ytTitleCache = newYTCache()
 
 type YouTube struct{}
 
@@ -40,9 +47,38 @@ func (y *YouTube) Decode(rawURL string) (model.DecodedURL, bool) {
 		return model.DecodedURL{}, false
 	}
 
+	data := map[string]string{"video_id": videoID}
+	if title, ok := ytTitleCache.get(videoID); ok {
+		if title != "" {
+			data["title"] = title
+		}
+	} else if title := fetchYouTubeTitle(videoID); title != "" {
+		data["title"] = title
+		ytTitleCache.set(videoID, title)
+	} else {
+		ytTitleCache.set(videoID, "")
+	}
+
 	return model.DecodedURL{
 		Decoder: y.Name(),
 		Kind:    "video",
-		Data:    map[string]string{"video_id": videoID},
+		Data:    data,
 	}, true
+}
+
+func fetchYouTubeTitle(videoID string) string {
+	oembedURL := fmt.Sprintf("https://www.youtube.com/oembed?url=%s&format=json",
+		url.QueryEscape("https://www.youtube.com/watch?v="+videoID))
+	resp, err := ytHTTPClient.Get(oembedURL)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		return ""
+	}
+	defer resp.Body.Close()
+	var result struct {
+		Title string `json:"title"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return ""
+	}
+	return result.Title
 }

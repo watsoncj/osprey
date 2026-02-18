@@ -18,12 +18,18 @@ import (
 )
 
 func main() {
-	hours := flag.Float64("hours", 24, "Number of hours of history to analyze")
+	lookback := flag.String("lookback", "24h", "How far back to analyze (e.g. 24h, 5d, 2w)")
 	format := flag.String("format", "text", "Output format: text or json")
 	flag.Parse()
 
+	lb, err := app.ParseLookback(*lookback)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "invalid -lookback value: %v\n", err)
+		os.Exit(1)
+	}
+
 	cfg := app.Config{
-		Lookback:    time.Duration(*hours * float64(time.Hour)),
+		Lookback:    lb,
 		Format:      *format,
 		DBOverrides: flag.Args(),
 	}
