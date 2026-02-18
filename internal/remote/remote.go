@@ -3,7 +3,6 @@ package remote
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/browser-forensics/browser-forensics/internal/embedded"
 	"github.com/browser-forensics/browser-forensics/internal/model"
+	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 	"golang.org/x/crypto/ssh/knownhosts"
@@ -25,12 +25,13 @@ type Options struct {
 	Host     string
 	Port     int
 	User     string
-	KeyFile  string // path to private key (optional if agent is available)
-	Password string // password auth fallback
-	Hours    float64
+	KeyFile        string // path to private key (optional if agent is available)
+	Password       string // password auth fallback
+	AcceptHostKey  bool   // skip host key verification
+	Hours          float64
 }
 
-const remoteAgentPath = `C:\Windows\Temp\bf-agent.exe`
+const agentFilename = "bf-agent.exe"
 
 // RunScan deploys the embedded agent to a remote Windows host over SSH,
 // executes it, collects the JSON report, and cleans up.
@@ -43,14 +44,15 @@ func RunScan(ctx context.Context, opts Options) (model.RunReport, error) {
 
 	log.Printf("Connected to %s", opts.Host)
 
-	if err := deployAgent(client); err != nil {
+	agentPath, err := deployAgent(client)
+	if err != nil {
 		return model.RunReport{}, fmt.Errorf("deploy agent: %w", err)
 	}
-	defer removeAgent(client)
+	defer removeAgent(client, agentPath)
 
-	log.Printf("Agent deployed to %s:%s", opts.Host, remoteAgentPath)
+	log.Printf("Agent deployed to %s:%s", opts.Host, agentPath)
 
-	report, err := executeAgent(ctx, client, opts.Hours)
+	report, err := executeAgent(ctx, client, agentPath, opts.Hours)
 	if err != nil {
 		return model.RunReport{}, fmt.Errorf("execute agent: %w", err)
 	}
@@ -107,12 +109,17 @@ func dial(ctx context.Context, opts Options) (*ssh.Client, error) {
 	}
 
 	var hostKeyCallback ssh.HostKeyCallback
-	knownHostsPath := filepath.Join(os.Getenv("HOME"), ".ssh", "known_hosts")
-	if cb, err := knownhosts.New(knownHostsPath); err == nil {
-		hostKeyCallback = cb
-	} else {
+	if opts.AcceptHostKey {
 		hostKeyCallback = ssh.InsecureIgnoreHostKey()
-		log.Printf("Warning: known_hosts not available, accepting any host key")
+		log.Printf("Warning: host key verification disabled")
+	} else {
+		knownHostsPath := filepath.Join(os.Getenv("HOME"), ".ssh", "known_hosts")
+		if cb, err := knownhosts.New(knownHostsPath); err == nil {
+			hostKeyCallback = cb
+		} else {
+			hostKeyCallback = ssh.InsecureIgnoreHostKey()
+			log.Printf("Warning: known_hosts not available, accepting any host key")
+		}
 	}
 
 	config := &ssh.ClientConfig{
@@ -143,54 +150,47 @@ func dial(ctx context.Context, opts Options) (*ssh.Client, error) {
 	return ssh.NewClient(c, chans, reqs), nil
 }
 
-// deployAgent writes the embedded agent binary to the remote host using
-// PowerShell base64 decoding over SSH. This avoids needing SFTP.
-func deployAgent(client *ssh.Client) error {
-	agentBytes := embedded.AgentEXE
+// deployAgent writes the embedded agent binary to the remote host via SFTP.
+// It writes to the user's home directory and returns the full remote path.
+func deployAgent(client *ssh.Client) (string, error) {
+	sftpClient, err := sftp.NewClient(client)
+	if err != nil {
+		return "", fmt.Errorf("sftp session: %w", err)
+	}
+	defer sftpClient.Close()
 
-	const chunkSize = 48000 // safe size for PowerShell command line
-
-	for i := 0; i < len(agentBytes); i += chunkSize {
-		end := i + chunkSize
-		if end > len(agentBytes) {
-			end = len(agentBytes)
-		}
-		chunk := agentBytes[i:end]
-		b64 := base64.StdEncoding.EncodeToString(chunk)
-
-		var cmd string
-		if i == 0 {
-			cmd = fmt.Sprintf(
-				`powershell -Command "[IO.File]::WriteAllBytes('%s', [Convert]::FromBase64String('%s'))"`,
-				remoteAgentPath, b64,
-			)
-		} else {
-			cmd = fmt.Sprintf(
-				`powershell -Command "$f = [IO.File]::OpenWrite('%s'); $f.Seek(0, [IO.SeekOrigin]::End) | Out-Null; $b = [Convert]::FromBase64String('%s'); $f.Write($b, 0, $b.Length); $f.Close()"`,
-				remoteAgentPath, b64,
-			)
-		}
-
-		session, err := client.NewSession()
-		if err != nil {
-			return fmt.Errorf("new session: %w", err)
-		}
-
-		var stderr bytes.Buffer
-		session.Stderr = &stderr
-		if err := session.Run(cmd); err != nil {
-			session.Close()
-			return fmt.Errorf("write chunk at offset %d: %w: %s", i, err, stderr.String())
-		}
-		session.Close()
-
-		log.Printf("Deployed %d/%d bytes", end, len(agentBytes))
+	// Get the user's home directory (SFTP working directory)
+	home, err := sftpClient.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("get remote home: %w", err)
 	}
 
-	return nil
+	sftpPath := home + "/" + agentFilename
+
+	f, err := sftpClient.Create(sftpPath)
+	if err != nil {
+		return "", fmt.Errorf("create remote file %s: %w", sftpPath, err)
+	}
+
+	agentBytes := embedded.AgentEXE
+	if _, err := f.Write(agentBytes); err != nil {
+		f.Close()
+		return "", fmt.Errorf("write agent: %w", err)
+	}
+
+	if err := f.Close(); err != nil {
+		return "", fmt.Errorf("close remote file: %w", err)
+	}
+
+	// Convert SFTP path (e.g. "/C:/Users/watso/bf-agent.exe") to Windows
+	// path (e.g. "C:/Users/watso/bf-agent.exe") for cmd execution.
+	windowsPath := strings.TrimPrefix(sftpPath, "/")
+
+	log.Printf("Deployed %d bytes via SFTP to %s", len(agentBytes), windowsPath)
+	return windowsPath, nil
 }
 
-func removeAgent(client *ssh.Client) {
+func removeAgent(client *ssh.Client, agentPath string) {
 	session, err := client.NewSession()
 	if err != nil {
 		log.Printf("Warning: could not create session to clean up agent: %v", err)
@@ -198,7 +198,7 @@ func removeAgent(client *ssh.Client) {
 	}
 	defer session.Close()
 
-	cmd := fmt.Sprintf(`del /f "%s"`, remoteAgentPath)
+	cmd := fmt.Sprintf(`del /f "%s"`, agentPath)
 	if err := session.Run(cmd); err != nil {
 		log.Printf("Warning: could not remove remote agent: %v", err)
 	} else {
@@ -206,7 +206,7 @@ func removeAgent(client *ssh.Client) {
 	}
 }
 
-func executeAgent(ctx context.Context, client *ssh.Client, hours float64) (model.RunReport, error) {
+func executeAgent(ctx context.Context, client *ssh.Client, agentPath string, hours float64) (model.RunReport, error) {
 	session, err := client.NewSession()
 	if err != nil {
 		return model.RunReport{}, err
@@ -217,7 +217,7 @@ func executeAgent(ctx context.Context, client *ssh.Client, hours float64) (model
 	session.Stdout = &stdout
 	session.Stderr = &stderr
 
-	cmd := fmt.Sprintf(`"%s" -format json -hours %g`, remoteAgentPath, hours)
+	cmd := fmt.Sprintf(`"%s" -format json -hours %g`, agentPath, hours)
 	log.Printf("Executing: %s", cmd)
 
 	done := make(chan error, 1)
