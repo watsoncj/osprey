@@ -14,20 +14,38 @@ type Config struct {
 	DBOverrides []string // explicit DB paths to scan instead of auto-discovery
 }
 
-// ParseLookback parses a duration string that supports days and weeks
-// in addition to Go's standard time.ParseDuration units.
-// Examples: "24h", "5d", "2w", "1w3d", "2d12h".
-func ParseLookback(s string) (time.Duration, error) {
+// Duration is a flag.Value that extends time.ParseDuration with "d" and "w" units.
+// Usage: flag.Var(&d, "lookback", "duration (e.g. 24h, 5d, 2w)")
+type Duration struct {
+	D time.Duration
+}
+
+func (d *Duration) String() string {
+	if d == nil {
+		return "24h"
+	}
+	return d.D.String()
+}
+
+func (d *Duration) Set(s string) error {
+	parsed, err := parseDuration(s)
+	if err != nil {
+		return err
+	}
+	d.D = parsed
+	return nil
+}
+
+func parseDuration(s string) (time.Duration, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
-		return 0, fmt.Errorf("empty duration string")
+		return 0, fmt.Errorf("empty duration")
 	}
 
 	var total time.Duration
 	remaining := s
 
 	for remaining != "" {
-		// Find the next numeric part.
 		i := 0
 		for i < len(remaining) && (remaining[i] == '.' || (remaining[i] >= '0' && remaining[i] <= '9')) {
 			i++
@@ -38,7 +56,6 @@ func ParseLookback(s string) (time.Duration, error) {
 		numStr := remaining[:i]
 		remaining = remaining[i:]
 
-		// Find the unit suffix.
 		j := 0
 		for j < len(remaining) && remaining[j] >= 'a' && remaining[j] <= 'z' {
 			j++
@@ -60,7 +77,6 @@ func ParseLookback(s string) (time.Duration, error) {
 		case "d":
 			total += time.Duration(val * float64(24*time.Hour))
 		default:
-			// Delegate to Go's parser for h, m, s, ms, us, ns.
 			d, err := time.ParseDuration(numStr + unit)
 			if err != nil {
 				return 0, fmt.Errorf("invalid duration %q", s)

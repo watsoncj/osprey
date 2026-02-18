@@ -44,7 +44,7 @@ func chromiumQuery(ctx context.Context, db *sql.DB, cutoff time.Time, browserNam
 		FROM visits v
 		JOIN urls u ON v.url = u.id
 		WHERE (v.visit_time / 1000000 - 11644473600) >= ?
-		ORDER BY v.visit_time DESC
+		ORDER BY v.visit_time ASC
 	`
 
 	rows, err := db.QueryContext(ctx, q, cutoffUnix)
@@ -186,7 +186,7 @@ func (f *Firefox) Query(ctx context.Context, db *sql.DB, cutoff time.Time) ([]mo
 		FROM moz_historyvisits h
 		JOIN moz_places p ON h.place_id = p.id
 		WHERE h.visit_date >= ?
-		ORDER BY h.visit_date DESC
+		ORDER BY h.visit_date ASC
 	`
 
 	rows, err := db.QueryContext(ctx, query, firefoxCutoff)
@@ -237,7 +237,7 @@ func (s *Safari) Query(ctx context.Context, db *sql.DB, cutoff time.Time) ([]mod
 		FROM history_visits v
 		JOIN history_items i ON v.history_item = i.id
 		WHERE v.visit_time >= ?
-		ORDER BY v.visit_time DESC
+		ORDER BY v.visit_time ASC
 	`
 
 	rows, err := db.QueryContext(ctx, query, safariCutoff)

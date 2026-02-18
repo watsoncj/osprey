@@ -18,18 +18,13 @@ import (
 )
 
 func main() {
-	lookback := flag.String("lookback", "24h", "How far back to analyze (e.g. 24h, 5d, 2w)")
+	lookback := app.Duration{D: 24 * time.Hour}
+	flag.Var(&lookback, "lookback", "How far back to analyze (e.g. 24h, 5d, 2w)")
 	format := flag.String("format", "text", "Output format: text or json")
 	flag.Parse()
 
-	lb, err := app.ParseLookback(*lookback)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "invalid -lookback value: %v\n", err)
-		os.Exit(1)
-	}
-
 	cfg := app.Config{
-		Lookback:    lb,
+		Lookback:    lookback.D,
 		Format:      *format,
 		DBOverrides: flag.Args(),
 	}
