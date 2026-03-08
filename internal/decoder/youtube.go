@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/browser-forensics/browser-forensics/internal/model"
+	"github.com/watsoncj/osprey/internal/model"
 )
 
 var ytHTTPClient = &http.Client{Timeout: 5 * time.Second}

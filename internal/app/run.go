@@ -11,11 +11,11 @@ import (
 	"sort"
 	"time"
 
-	"github.com/browser-forensics/browser-forensics/internal/decoder"
-	"github.com/browser-forensics/browser-forensics/internal/finder"
-	"github.com/browser-forensics/browser-forensics/internal/flagging"
-	"github.com/browser-forensics/browser-forensics/internal/model"
-	"github.com/browser-forensics/browser-forensics/internal/sqliteio"
+	"github.com/watsoncj/osprey/internal/decoder"
+	"github.com/watsoncj/osprey/internal/finder"
+	"github.com/watsoncj/osprey/internal/flagging"
+	"github.com/watsoncj/osprey/internal/model"
+	"github.com/watsoncj/osprey/internal/sqliteio"
 )
 
 // Browser defines what Run needs from each browser adapter.

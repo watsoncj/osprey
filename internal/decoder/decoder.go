@@ -1,6 +1,6 @@
 package decoder
 
-import "github.com/browser-forensics/browser-forensics/internal/model"
+import "github.com/watsoncj/osprey/internal/model"
 
 // URLDecoder extracts structured information from URLs.
 type URLDecoder interface {

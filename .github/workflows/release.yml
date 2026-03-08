@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build all targets
+        run: |
+          # CLI - multi-platform
+          GOOS=linux   GOARCH=amd64 go build -trimpath -o dist/osprey-linux-amd64        ./cmd/osprey/
+          GOOS=linux   GOARCH=arm64 go build -trimpath -o dist/osprey-linux-arm64        ./cmd/osprey/
+          GOOS=darwin  GOARCH=amd64 go build -trimpath -o dist/osprey-darwin-amd64       ./cmd/osprey/
+          GOOS=darwin  GOARCH=arm64 go build -trimpath -o dist/osprey-darwin-arm64       ./cmd/osprey/
+          GOOS=windows GOARCH=amd64 go build -trimpath -o dist/osprey-windows-amd64.exe  ./cmd/osprey/
+
+          # Agent - primarily Windows, but also linux/darwin for testing
+          GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o dist/osprey-agent-windows-amd64.exe ./cmd/agent/
+          GOOS=linux   GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o dist/osprey-agent-linux-amd64      ./cmd/agent/
+          GOOS=linux   GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o dist/osprey-agent-linux-arm64      ./cmd/agent/
+          GOOS=darwin  GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o dist/osprey-agent-darwin-amd64     ./cmd/agent/
+          GOOS=darwin  GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o dist/osprey-agent-darwin-arm64     ./cmd/agent/
+
+          # Server - linux/darwin/windows
+          GOOS=linux   GOARCH=amd64 go build -trimpath -o dist/osprey-server-linux-amd64        ./cmd/server/
+          GOOS=linux   GOARCH=arm64 go build -trimpath -o dist/osprey-server-linux-arm64        ./cmd/server/
+          GOOS=darwin  GOARCH=amd64 go build -trimpath -o dist/osprey-server-darwin-amd64       ./cmd/server/
+          GOOS=darwin  GOARCH=arm64 go build -trimpath -o dist/osprey-server-darwin-arm64       ./cmd/server/
+          GOOS=windows GOARCH=amd64 go build -trimpath -o dist/osprey-server-windows-amd64.exe  ./cmd/server/
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: dist/*

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/browser-forensics/browser-forensics/internal/model"
+	"github.com/watsoncj/osprey/internal/model"
 )
 
 type JSONReporter struct{}

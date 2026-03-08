@@ -1,3 +1,4 @@
-browser-forensics
-browser-forensics.exe
-internal/embedded/agent.exe
+/osprey
+/osprey-agent
+/osprey-agent.exe
+/osprey-server

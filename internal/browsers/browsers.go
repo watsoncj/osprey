@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/browser-forensics/browser-forensics/internal/model"
+	"github.com/watsoncj/osprey/internal/model"
 )
 
 // Browser defines the interface each browser adapter must implement.

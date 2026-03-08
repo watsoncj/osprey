@@ -3,7 +3,7 @@ package report
 import (
 	"io"
 
-	"github.com/browser-forensics/browser-forensics/internal/model"
+	"github.com/watsoncj/osprey/internal/model"
 )
 
 // Reporter writes a RunReport to the given writer.

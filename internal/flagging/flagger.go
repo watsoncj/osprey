@@ -4,7 +4,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/browser-forensics/browser-forensics/internal/model"
+	"github.com/watsoncj/osprey/internal/model"
 )
 
 // Flagger checks visits against keyword lists organized by category.

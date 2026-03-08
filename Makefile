@@ -1,22 +1,26 @@
-AGENT_EMBED := internal/embedded/agent.exe
-CONTROLLER  := browser-forensics
+OSPREY := osprey
+AGENT  := osprey-agent
+SERVER := osprey-server
 
-.PHONY: all clean agent controller
+.PHONY: all clean osprey agent server
 
-all: controller
+all: osprey agent server
 
-# Cross-compile the agent for Windows amd64
+# CLI tool for local scanning
+osprey:
+	go build -trimpath -o $(OSPREY) ./cmd/osprey/
+
+# Agent binary (daemon-capable, for deployment to endpoints)
 agent:
-	GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o $(AGENT_EMBED) ./cmd/agent/
+	go build -trimpath -ldflags="-s -w" -o $(AGENT) ./cmd/agent/
 
-# Build the controller (embeds the Windows agent)
-controller: agent
-	go build -trimpath -o $(CONTROLLER) ./cmd/browser-forensics/
+# Cross-compile agent for Windows
+agent-windows:
+	GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o $(AGENT).exe ./cmd/agent/
 
-# Local-only build (no embedded agent, for development)
-dev:
-	go build -o $(CONTROLLER) ./cmd/browser-forensics/
+# Collection server
+server:
+	go build -trimpath -o $(SERVER) ./cmd/server/
 
 clean:
-	rm -f $(CONTROLLER) $(AGENT_EMBED)
-	echo "placeholder" > $(AGENT_EMBED)
+	rm -f $(OSPREY) $(AGENT) $(AGENT).exe $(SERVER)

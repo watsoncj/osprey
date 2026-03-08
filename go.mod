@@ -1,4 +1,4 @@
-module github.com/browser-forensics/browser-forensics
+module github.com/watsoncj/osprey
 
 go 1.25.6
 

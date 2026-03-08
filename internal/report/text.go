@@ -5,13 +5,13 @@ import (
 	"io"
 	"strings"
 
-	"github.com/browser-forensics/browser-forensics/internal/model"
+	"github.com/watsoncj/osprey/internal/model"
 )
 
 type TextReporter struct{}
 
 func (t *TextReporter) Write(w io.Writer, rr model.RunReport) error {
-	fmt.Fprintf(w, "Browser Forensics Report\n")
+	fmt.Fprintf(w, "Osprey Report\n")
 	fmt.Fprintf(w, "========================\n")
 	fmt.Fprintf(w, "Scan started: %s\n", rr.StartedAt.Format("2006-01-02 15:04:05"))
 	fmt.Fprintf(w, "History since: %s\n\n", rr.Cutoff.Format("2006-01-02 15:04:05"))

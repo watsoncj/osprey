@@ -21,7 +21,7 @@ func newYTCache() *ytCache {
 	if err != nil {
 		return c
 	}
-	cacheDir := filepath.Join(dir, "browser-forensics")
+	cacheDir := filepath.Join(dir, "osprey")
 	_ = os.MkdirAll(cacheDir, 0o755)
 	c.path = filepath.Join(cacheDir, "youtube-titles.json")
 

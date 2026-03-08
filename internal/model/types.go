@@ -64,6 +64,7 @@ type DomainCount struct {
 
 // RunReport is the top-level output of a full scan.
 type RunReport struct {
+	Hostname  string     `json:"hostname"`
 	StartedAt time.Time  `json:"started_at"`
 	Cutoff    time.Time  `json:"cutoff"`
 	DBReports []DBReport `json:"db_reports"`
