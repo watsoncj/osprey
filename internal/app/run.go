@@ -137,13 +137,6 @@ func detectIncognito(ctx context.Context, historyPath string, browserName string
 	}
 	defer fdb.Close()
 
-	hdb, err := sqliteio.OpenReadonly(ctx, historyPath)
-	if err != nil {
-		return nil
-	}
-	defer hdb.Close()
-
-	// Collect all page URLs from favicon icon_mapping.
 	const faviconQuery = `SELECT DISTINCT page_url FROM icon_mapping`
 	rows, err := fdb.QueryContext(ctx, faviconQuery)
 	if err != nil {
@@ -152,54 +145,25 @@ func detectIncognito(ctx context.Context, historyPath string, browserName string
 	}
 	defer rows.Close()
 
-	var faviconURLs []string
+	var indicators []model.IncognitoIndicator
 	for rows.Next() {
 		var u string
 		if err := rows.Scan(&u); err != nil {
 			continue
 		}
-		faviconURLs = append(faviconURLs, u)
+		indicators = append(indicators, model.IncognitoIndicator{
+			URL:     u,
+			Browser: browserName,
+			DBPath:  faviconPath,
+			Decoded: dec.DecodeAll(u),
+		})
 	}
 	if err := rows.Err(); err != nil {
 		return nil
 	}
 
-	if len(faviconURLs) == 0 {
-		return nil
-	}
-
-	// Build a set of all known history URLs for fast lookup.
-	const historyQuery = `SELECT url FROM urls`
-	hrows, err := hdb.QueryContext(ctx, historyQuery)
-	if err != nil {
-		return nil
-	}
-	defer hrows.Close()
-
-	historyURLs := make(map[string]bool)
-	for hrows.Next() {
-		var u string
-		if err := hrows.Scan(&u); err != nil {
-			continue
-		}
-		historyURLs[u] = true
-	}
-
-	var indicators []model.IncognitoIndicator
-	for _, u := range faviconURLs {
-		if !historyURLs[u] {
-			ind := model.IncognitoIndicator{
-				URL:     u,
-				Browser: browserName,
-				DBPath:  faviconPath,
-				Decoded: dec.DecodeAll(u),
-			}
-			indicators = append(indicators, ind)
-		}
-	}
-
 	if len(indicators) > 0 {
-		log.Printf("Incognito detection: found %d favicon-only URL(s) in %s", len(indicators), faviconPath)
+		log.Printf("Favicon URLs: found %d URL(s) in %s", len(indicators), faviconPath)
 	}
 	return indicators
 }
