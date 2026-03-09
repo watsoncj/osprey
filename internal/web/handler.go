@@ -129,6 +129,9 @@ func Handler(s *store.Store) http.Handler {
 
 	staticSub, _ := fs.Sub(staticFS, "static")
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(staticSub)))
+	mux.HandleFunc("GET /favicon.ico", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/static/favicon.ico", http.StatusMovedPermanently)
+	})
 
 	mux.HandleFunc("GET /", handleDashboard(s))
 	mux.HandleFunc("GET /hosts/{hostname}", handleHost(s))

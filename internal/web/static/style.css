@@ -131,7 +131,6 @@ h3 { font-size: 1.15em; }
 .nav-logo {
   height: 2.5rem;
   width: 2.5rem;
-  filter: invert(1);
 }
 
 .nav-brand:hover {
