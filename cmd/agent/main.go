@@ -18,7 +18,9 @@ import (
 
 	"github.com/watsoncj/osprey/internal/app"
 	"github.com/watsoncj/osprey/internal/browsers"
+	"github.com/watsoncj/osprey/internal/buildinfo"
 	"github.com/watsoncj/osprey/internal/model"
+	"github.com/watsoncj/osprey/internal/selfupdate"
 	"github.com/watsoncj/osprey/internal/spool"
 	"github.com/watsoncj/osprey/internal/upload"
 )
@@ -35,9 +37,30 @@ func main() {
 	spoolDir := flag.String("spool", "./spool", "Directory to spool failed uploads for retry")
 	logFile := flag.String("logfile", "", "Path to log file (default: stderr)")
 	skipVerify := flag.Bool("skip-verify", false, "Skip TLS certificate verification (for self-signed certs)")
+	noUpdate := flag.Bool("no-update", false, "Disable automatic self-update")
+	selfUpdate := flag.Bool("self-update", false, "Check for update and exit")
+	version := flag.Bool("version", false, "Print version and exit")
 	install := flag.Bool("install", false, "Install agent as a system service")
 	uninstall := flag.Bool("uninstall", false, "Uninstall agent system service")
 	flag.Parse()
+
+	if *version {
+		fmt.Println(buildinfo.Version)
+		return
+	}
+
+	if *selfUpdate {
+		newVer, err := selfupdate.CheckAndApply(context.Background(), buildinfo.Version, selfupdate.Agent, nil)
+		if err != nil {
+			log.Fatalf("self-update: %v", err)
+		}
+		if newVer == "" {
+			fmt.Println("Already up to date.")
+		} else {
+			fmt.Printf("Updated to %s. Restart the agent to use the new version.\n", newVer)
+		}
+		return
+	}
 
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	if *logFile != "" {
@@ -79,6 +102,8 @@ func main() {
 		return
 	}
 
+	selfupdate.Cleanup()
+
 	var httpClient *http.Client
 	if *skipVerify {
 		httpClient = upload.InsecureClient()
@@ -89,7 +114,7 @@ func main() {
 	}
 
 	daemonFn := func(ctx context.Context) {
-		runDaemon(ctx, *server, *hostname, lookback.D, interval.D, *apiKey, *spoolDir, httpClient)
+		runDaemon(ctx, *server, *hostname, lookback.D, interval.D, *apiKey, *spoolDir, httpClient, !*noUpdate)
 	}
 	if isWindowsService() {
 		if err := runWindowsService(daemonFn); err != nil {
@@ -143,8 +168,8 @@ func latestVisitTime(sub *model.Submission) time.Time {
 	return latest
 }
 
-func runDaemon(ctx context.Context, serverURL, hostname string, lookback time.Duration, interval time.Duration, apiKey string, spoolDir string, client *http.Client) {
-	log.Printf("Starting daemon: server=%s hostname=%s interval=%s", serverURL, hostname, interval)
+func runDaemon(ctx context.Context, serverURL, hostname string, lookback time.Duration, interval time.Duration, apiKey string, spoolDir string, client *http.Client, autoUpdate bool) {
+	log.Printf("Starting daemon: server=%s hostname=%s interval=%s version=%s", serverURL, hostname, interval, buildinfo.Version)
 
 	sp := &spool.Spool{Dir: spoolDir}
 
@@ -191,6 +216,18 @@ func runDaemon(ctx context.Context, serverURL, hostname string, lookback time.Du
 		}
 
 		scanCancel()
+
+		if autoUpdate {
+			updateCtx, updateCancel := context.WithTimeout(ctx, 2*time.Minute)
+			if newVer, err := selfupdate.CheckAndApply(updateCtx, buildinfo.Version, selfupdate.Agent, client); err != nil {
+				log.Printf("Self-update check failed: %v", err)
+			} else if newVer != "" {
+				log.Printf("Updated to %s — exiting for service restart", newVer)
+				updateCancel()
+				os.Exit(0)
+			}
+			updateCancel()
+		}
 
 		log.Printf("Next scan in %s", interval)
 		select {

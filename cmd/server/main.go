@@ -1,17 +1,21 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/watsoncj/osprey/internal/buildinfo"
 	"github.com/watsoncj/osprey/internal/ingest"
 	"github.com/watsoncj/osprey/internal/model"
+	"github.com/watsoncj/osprey/internal/selfupdate"
 	"github.com/watsoncj/osprey/internal/store"
 	"github.com/watsoncj/osprey/internal/web"
 )
@@ -22,9 +26,30 @@ func main() {
 	certFile := flag.String("cert", "", "Path to TLS certificate file (enables HTTPS)")
 	keyFile := flag.String("key", "", "Path to TLS private key file")
 	apiKey := flag.String("api-key", "", "API key required for report uploads (optional)")
+	noUpdate := flag.Bool("no-update", false, "Disable automatic self-update")
+	version := flag.Bool("version", false, "Print version and exit")
+	selfUpdate := flag.Bool("self-update", false, "Check for update and exit")
 	install := flag.Bool("install", false, "Install server as a system service")
 	uninstall := flag.Bool("uninstall", false, "Uninstall server system service")
 	flag.Parse()
+
+	if *version {
+		fmt.Println(buildinfo.Version)
+		return
+	}
+
+	if *selfUpdate {
+		newVer, err := selfupdate.CheckAndApply(context.Background(), buildinfo.Version, selfupdate.Server, nil)
+		if err != nil {
+			log.Fatalf("self-update: %v", err)
+		}
+		if newVer == "" {
+			fmt.Println("Already up to date.")
+		} else {
+			fmt.Printf("Updated to %s. Restart the server to use the new version.\n", newVer)
+		}
+		return
+	}
 
 	if *install {
 		if err := installService(*listen, *dataDir, *apiKey); err != nil {
@@ -43,6 +68,27 @@ func main() {
 	}
 
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
+	selfupdate.Cleanup()
+
+	if !*noUpdate {
+		go func() {
+			// Check for updates every 12 hours.
+			ticker := time.NewTicker(12 * time.Hour)
+			defer ticker.Stop()
+			for range ticker.C {
+				ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+				newVer, err := selfupdate.CheckAndApply(ctx, buildinfo.Version, selfupdate.Server, nil)
+				cancel()
+				if err != nil {
+					log.Printf("Self-update check failed: %v", err)
+				} else if newVer != "" {
+					log.Printf("Updated to %s — exiting for service restart", newVer)
+					os.Exit(0)
+				}
+			}
+		}()
+	}
 
 	s := &store.Store{Dir: *dataDir}
 	pipeline := ingest.New()

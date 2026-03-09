@@ -203,3 +203,19 @@ Move from report-centric storage to a visit-centric model. The agent sends raw v
 
 - [x] **6.7.3 — Update Makefile if needed**
   Ensure build targets still work with any new/removed packages.
+
+### Phase 7: Self-Update
+
+- [x] **7.1 — Build-time version injection (`internal/buildinfo`)**
+  Shared `Version` variable set via `-ldflags`. Makefile and GHA workflow inject `git describe` / `$GITHUB_REF_NAME`.
+
+- [x] **7.2 — Self-update package (`internal/selfupdate`)**
+  Checks GitHub Releases API for latest release, matches asset by component (`agent`/`server`) + `GOOS`/`GOARCH`, compares semver, downloads and atomically replaces the binary. Platform-specific apply: atomic rename on Unix, rename-old + write-new on Windows.
+
+- [x] **7.3 — Agent auto-update**
+  Checks for updates between daemon loop iterations. On update, exits with code 0 for service manager restart. Disabled with `-no-update`. Manual trigger with `-self-update`.
+
+- [x] **7.4 — Server auto-update**
+  Background goroutine checks every 12 hours. On update, exits for service manager restart. Disabled with `-no-update`. Manual trigger with `-self-update`.
+
+- [x] **7.5 — `-version` flag on both binaries**
