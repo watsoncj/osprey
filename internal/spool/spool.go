@@ -52,7 +52,7 @@ func (s *Spool) List() ([]Entry, error) {
 
 	var result []Entry
 	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") || e.Name() == "last_scan.json" {
 			continue
 		}
 
