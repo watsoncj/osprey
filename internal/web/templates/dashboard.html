@@ -8,6 +8,7 @@
   <thead>
     <tr>
       <th>Hostname</th>
+      <th>Agent Version</th>
       <th>Total Visits</th>
       <th>Flagged</th>
       <th>Latest Activity</th>
@@ -18,6 +19,7 @@
     {{range .Hosts}}
     <tr>
       <td><a href="/hosts/{{.Hostname}}">{{.Hostname}}</a></td>
+      <td>{{if .AgentVersion}}{{.AgentVersion}}{{else}}—{{end}}</td>
       <td>{{.TotalVisits}}</td>
       <td{{if gt .FlaggedVisits 0}} class="flagged"{{end}}>{{.FlaggedVisits}}</td>
       <td>{{if .LatestVisit.IsZero}}—{{else}}{{fmtTime .LatestVisit}}{{end}}</td>

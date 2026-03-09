@@ -159,7 +159,13 @@ func handlePostVisits(s *store.Store, p *ingest.Pipeline, apiKey string) http.Ha
 			}
 		}
 
-		log.Printf("Stored %d new visits from %s", newVisits, hostname)
+		if sub.AgentVersion != "" {
+			if err := s.SaveHostMeta(hostname, sub.AgentVersion); err != nil {
+				log.Printf("save host meta error: %v", err)
+			}
+		}
+
+		log.Printf("Stored %d new visits from %s (agent %s)", newVisits, hostname, sub.AgentVersion)
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(map[string]interface{}{"status": "ok", "new_visits": newVisits})
 	}

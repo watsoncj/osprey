@@ -219,3 +219,22 @@ Move from report-centric storage to a visit-centric model. The agent sends raw v
   Background goroutine checks every 12 hours. On update, exits for service manager restart. Disabled with `-no-update`. Manual trigger with `-self-update`.
 
 - [x] **7.5 — `-version` flag on both binaries**
+
+### Phase 8: Agent Version Reporting
+
+Report the agent's build version to the server so operators can see which version each endpoint is running from the dashboard.
+
+- [x] **8.1 — Add `AgentVersion` field to `model.Submission`**
+  Add `AgentVersion string \`json:"agent_version,omitempty"\`` to the `Submission` struct.
+
+- [x] **8.2 — Agent populates `AgentVersion` from `buildinfo.Version`**
+  In `cmd/agent/main.go`, set `sub.AgentVersion = buildinfo.Version` before uploading.
+
+- [x] **8.3 — Server persists agent version per host (`internal/store`)**
+  On receiving a submission, write `{data_dir}/{hostname}/meta.json` with `{"agent_version": "...", "last_seen": "..."}`. New store methods: `SaveHostMeta(hostname, version string)`, `LoadHostMeta(hostname string) (HostMeta, error)`.
+
+- [x] **8.4 — Add `AgentVersion` to `HostStats`**
+  `HostStats` gains an `AgentVersion string` field. `HostStats()` reads `meta.json` and populates it.
+
+- [x] **8.5 — Display agent version on dashboard**
+  Add an "Agent Version" column to the dashboard table in `templates/dashboard.html`.

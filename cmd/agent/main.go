@@ -199,6 +199,7 @@ func runDaemon(ctx context.Context, serverURL, hostname string, lookback time.Du
 
 		sub := app.ScanRaw(scanCtx, cfg, adapters)
 		sub.Hostname = hostname
+		sub.AgentVersion = buildinfo.Version
 
 		if err := upload.Upload(scanCtx, serverURL, hostname, sub, apiKey, client); err != nil {
 			log.Printf("Upload failed: %v", err)

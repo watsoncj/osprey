@@ -27,12 +27,49 @@ type VisitQuery struct {
 // HostStats holds aggregate statistics for a hostname.
 type HostStats struct {
 	Hostname       string              `json:"hostname"`
+	AgentVersion   string              `json:"agent_version,omitempty"`
 	TotalVisits    int                 `json:"total_visits"`
 	FlaggedVisits  int                 `json:"flagged_visits"`
 	LatestVisit    time.Time           `json:"latest_visit"`
 	CategoryCounts map[string]int      `json:"category_counts,omitempty"`
 	TopDomains     []model.DomainCount `json:"top_domains,omitempty"`
 	Users          []string            `json:"users,omitempty"`
+}
+
+// HostMeta holds per-host metadata persisted to meta.json.
+type HostMeta struct {
+	AgentVersion string    `json:"agent_version"`
+	LastSeen     time.Time `json:"last_seen"`
+}
+
+// SaveHostMeta writes agent metadata for a hostname.
+func (s *Store) SaveHostMeta(hostname, agentVersion string) error {
+	dir := filepath.Join(s.Dir, hostname)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("create dir: %w", err)
+	}
+	meta := HostMeta{
+		AgentVersion: agentVersion,
+		LastSeen:     time.Now().UTC(),
+	}
+	data, err := json.Marshal(meta)
+	if err != nil {
+		return fmt.Errorf("marshal meta: %w", err)
+	}
+	return os.WriteFile(filepath.Join(dir, "meta.json"), data, 0o644)
+}
+
+// LoadHostMeta reads agent metadata for a hostname.
+func (s *Store) LoadHostMeta(hostname string) (HostMeta, error) {
+	data, err := os.ReadFile(filepath.Join(s.Dir, hostname, "meta.json"))
+	if err != nil {
+		return HostMeta{}, err
+	}
+	var meta HostMeta
+	if err := json.Unmarshal(data, &meta); err != nil {
+		return HostMeta{}, err
+	}
+	return meta, nil
 }
 
 // AppendVisits appends non-duplicate visits to the hostname's visits.jsonl file.
@@ -196,6 +233,10 @@ func (s *Store) LoadIncognito(hostname string) ([]model.IncognitoIndicator, erro
 // HostStats computes aggregate statistics for a hostname's visits.
 func (s *Store) HostStats(hostname string) (HostStats, error) {
 	stats := HostStats{Hostname: hostname}
+
+	if meta, err := s.LoadHostMeta(hostname); err == nil {
+		stats.AgentVersion = meta.AgentVersion
+	}
 
 	visits, err := s.LoadVisits(hostname, VisitQuery{})
 	if err != nil {

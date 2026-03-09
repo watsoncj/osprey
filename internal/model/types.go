@@ -93,6 +93,7 @@ type RawIncognitoIndicator struct {
 // Contains raw visit data — no decoding or flagging.
 type Submission struct {
 	Hostname            string                  `json:"hostname"`
+	AgentVersion        string                  `json:"agent_version,omitempty"`
 	ScannedAt           time.Time               `json:"scanned_at"`
 	Visits              []RawVisit              `json:"visits"`
 	IncognitoIndicators []RawIncognitoIndicator `json:"incognito_indicators,omitempty"`
