@@ -1,0 +1,558 @@
+/* Osprey – minimal light/dark theme stylesheet */
+
+:root {
+  /* Light theme */
+  --bg: #ffffff;
+  --bg-secondary: #f5f5f7;
+  --text: #1d1d1f;
+  --text-muted: #6e6e73;
+  --border: #d2d2d7;
+  --link: #0066cc;
+  --link-hover: #004499;
+  --navbar-bg: #1d1d1f;
+  --navbar-text: #f5f5f7;
+  --table-stripe: #f9f9fb;
+  --table-hover: #eef0f4;
+  --error-bg: #fef2f2;
+  --error-text: #991b1b;
+  --error-border: #fca5a5;
+  --flagged-bg: #fef3c7;
+  --flagged-text: #92400e;
+  --card-bg: #ffffff;
+  --card-border: #e5e5ea;
+  --card-accent: #0066cc;
+  --badge-fg: #1d1d1f;
+
+  /* Badge category colors – muted pastels */
+  --badge-violence: #f4a6a0;
+  --badge-drugs: #a0c4f4;
+  --badge-weapons: #c4a0f4;
+  --badge-self-harm: #f4c4a0;
+  --badge-bullying: #f4e0a0;
+  --badge-hate: #f4a0d8;
+  --badge-adult: #a0f4c4;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1a1a2e;
+    --bg-secondary: #22223a;
+    --text: #e4e4e8;
+    --text-muted: #9999a8;
+    --border: #3a3a50;
+    --link: #5eaaff;
+    --link-hover: #8ac4ff;
+    --navbar-bg: #12121f;
+    --navbar-text: #e4e4e8;
+    --table-stripe: #22223a;
+    --table-hover: #2c2c44;
+    --error-bg: #3b1111;
+    --error-text: #fca5a5;
+    --error-border: #7f1d1d;
+    --flagged-bg: #422006;
+    --flagged-text: #fcd34d;
+    --card-bg: #22223a;
+    --card-border: #3a3a50;
+    --card-accent: #5eaaff;
+    --badge-fg: #1d1d1f;
+
+    --badge-violence: #c47a74;
+    --badge-drugs: #7498c4;
+    --badge-weapons: #9874c4;
+    --badge-self-harm: #c49874;
+    --badge-bullying: #c4b274;
+    --badge-hate: #c474a8;
+    --badge-adult: #74c498;
+  }
+}
+
+/* ---- Reset & Base ---- */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+}
+
+a {
+  color: var(--link);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--link-hover);
+  text-decoration: underline;
+}
+
+code, pre, .mono {
+  font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+  font-size: 0.9em;
+}
+
+h1, h2, h3, h4 {
+  margin: 1.2em 0 0.4em;
+  line-height: 1.25;
+}
+
+h1 { font-size: 1.6em; }
+h2 { font-size: 1.35em; }
+h3 { font-size: 1.15em; }
+
+/* ---- Navbar ---- */
+
+.navbar {
+  display: flex;
+  align-items: center;
+  padding: 0 1.25rem;
+  height: 3rem;
+  background: var(--navbar-bg);
+  color: var(--navbar-text);
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-brand {
+  font-weight: 700;
+  font-size: 1.1em;
+  color: var(--navbar-text);
+  text-decoration: none;
+  letter-spacing: 0.02em;
+}
+
+.nav-brand:hover {
+  color: var(--navbar-text);
+  opacity: 0.85;
+  text-decoration: none;
+}
+
+/* ---- Container ---- */
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem 1.25rem 2rem;
+}
+
+/* ---- Breadcrumb ---- */
+
+.breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25em;
+  list-style: none;
+  padding: 0.75rem 0 0.25rem;
+  margin: 0;
+  font-size: 0.9em;
+  color: var(--text-muted);
+}
+
+.breadcrumb a {
+  color: var(--link);
+}
+
+.breadcrumb span {
+  color: var(--text-muted);
+}
+
+.breadcrumb a + span::before,
+.breadcrumb span + a::before,
+.breadcrumb span + span::before,
+.breadcrumb a + a::before {
+  content: "/";
+  margin-right: 0.25em;
+  color: var(--text-muted);
+}
+
+/* ---- Data Table ---- */
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95em;
+  margin: 1rem 0;
+}
+
+.data-table th,
+.data-table td {
+  padding: 0.55rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.data-table th {
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.data-table td {
+  font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+  font-size: 0.88em;
+}
+
+/* Right-align numeric columns */
+.data-table td:last-child,
+.data-table th:last-child {
+  text-align: right;
+}
+
+/* Zebra striping */
+.data-table tbody tr:nth-child(even) {
+  background: var(--table-stripe);
+}
+
+.data-table tbody tr:hover {
+  background: var(--table-hover);
+}
+
+/* Responsive table wrapper */
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ---- Empty State ---- */
+
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ---- Flagged highlight ---- */
+
+.flagged {
+  background: var(--flagged-bg);
+  color: var(--flagged-text);
+  font-weight: 600;
+  padding: 0.1em 0.4em;
+  border-radius: 3px;
+}
+
+/* ---- Report Header ---- */
+
+.report-header {
+  padding: 1rem 0;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.report-header h1,
+.report-header h2 {
+  margin-top: 0;
+}
+
+/* ---- Database Section ---- */
+
+.db-section {
+  margin: 1.5rem 0;
+  padding-top: 1.5rem;
+  border-top: 2px solid var(--border);
+}
+
+.db-section:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+/* ---- Summary Stats ---- */
+
+.summary-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2rem;
+  margin: 1rem 0;
+  font-size: 0.95em;
+}
+
+.summary-stats dt {
+  color: var(--text-muted);
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.summary-stats dd {
+  margin: 0 0 0.25rem;
+  font-weight: 600;
+  font-size: 1.15em;
+}
+
+/* ---- Error ---- */
+
+.error {
+  background: var(--error-bg);
+  color: var(--error-text);
+  border: 1px solid var(--error-border);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+}
+
+/* ---- Badges ---- */
+
+.badge {
+  display: inline-block;
+  font-size: 0.75em;
+  font-weight: 600;
+  padding: 0.15em 0.55em;
+  border-radius: 4px;
+  color: var(--badge-fg);
+  background: var(--border);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.badge-violence  { background: var(--badge-violence); }
+.badge-drugs     { background: var(--badge-drugs); }
+.badge-weapons   { background: var(--badge-weapons); }
+.badge-self-harm { background: var(--badge-self-harm); }
+.badge-bullying  { background: var(--badge-bullying); }
+.badge-hate      { background: var(--badge-hate); }
+.badge-adult     { background: var(--badge-adult); }
+
+/* ---- Video List ---- */
+
+.video-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+
+.video-list li {
+  padding: 0.4rem 0;
+  border-bottom: 1px solid var(--border);
+  font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+  font-size: 0.88em;
+}
+
+.video-list li:last-child {
+  border-bottom: none;
+}
+
+/* ---- Flagged Item ---- */
+
+.flagged-item {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-left: 4px solid var(--card-accent);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin: 0.75rem 0;
+}
+
+.flagged-item a {
+  word-break: break-all;
+}
+
+/* ---- Incognito List ---- */
+
+.incognito-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+
+.incognito-list li {
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.95em;
+}
+
+.incognito-list li:last-child {
+  border-bottom: none;
+}
+
+/* ---- Decoded List ---- */
+
+.decoded-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+
+.decoded-list li {
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--border);
+  font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+  font-size: 0.85em;
+  word-break: break-all;
+}
+
+.decoded-list li:last-child {
+  border-bottom: none;
+}
+
+/* ---- Responsive ---- */
+
+@media (max-width: 768px) {
+  .container {
+    padding: 0.75rem;
+  }
+
+  .data-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .summary-stats {
+    gap: 0.5rem 1rem;
+  }
+}
+
+/* ---- Nav Links ---- */
+
+.nav-links {
+  margin-left: auto;
+}
+
+.nav-links a {
+  color: var(--navbar-text);
+  margin-left: 1.5rem;
+  font-size: 0.9em;
+  opacity: 0.85;
+}
+
+.nav-links a:hover {
+  opacity: 1;
+  text-decoration: none;
+}
+
+/* ---- Host Stats ---- */
+
+.host-stats {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem 1.25rem;
+  margin: 1rem 0;
+}
+
+.host-stats dl {
+  display: flex;
+  gap: 2rem;
+  margin: 0;
+}
+
+.host-stats dt {
+  color: var(--text-muted);
+  font-size: 0.85em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.host-stats dd {
+  margin: 0 0 0.25rem;
+  font-weight: 600;
+  font-size: 1.15em;
+}
+
+/* ---- Filter Bar ---- */
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  margin: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.filter-bar label {
+  font-size: 0.9em;
+  cursor: pointer;
+}
+
+.filter-bar select,
+.filter-bar input[type="date"] {
+  font-size: 0.88em;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* ---- Toggle Button ---- */
+
+.toggle-btn {
+  font-size: 0.88em;
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.toggle-btn:hover {
+  border-color: var(--link);
+  color: var(--text);
+}
+
+.toggle-btn.active {
+  background: var(--link);
+  border-color: var(--link);
+  color: #fff;
+}
+
+/* ---- Visit Table ---- */
+
+.visit-table td:first-child {
+  white-space: nowrap;
+}
+
+.url-cell {
+  word-break: break-all;
+  max-width: 400px;
+}
+
+.flagged-row {
+  border-left: 3px solid var(--flagged-text);
+}
+
+/* ---- Pagination ---- */
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 0;
+  font-size: 0.9em;
+}
+
+.pagination a {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  text-decoration: none;
+}
+
+.pagination a:hover {
+  background: var(--table-hover);
+}
+
+/* ---- Decoded Tag ---- */
+
+.decoded-tag {
+  display: inline-block;
+  font-size: 0.8em;
+  padding: 0.1em 0.4em;
+  margin: 0.15em 0;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-family: "SF Mono", "Cascadia Code", "Fira Code", Consolas, monospace;
+}

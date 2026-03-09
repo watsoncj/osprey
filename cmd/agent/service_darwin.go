@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,17 +15,29 @@ func plistPath() string {
 	return filepath.Join("/Library/LaunchDaemons", plistLabel+".plist")
 }
 
-func installService(serverURL, hostname string, interval, lookback time.Duration, apiKey string) error {
+func installService(serverURL, hostname string, interval, lookback time.Duration, apiKey, spoolDir, logFile string, skipVerify bool) error {
 	exe, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("get executable path: %w", err)
 	}
 
-	apiKeyArgs := ""
+	args := []string{exe, "-server", serverURL, "-hostname", hostname, "-interval", interval.String(), "-lookback", lookback.String()}
 	if apiKey != "" {
-		apiKeyArgs = fmt.Sprintf(`
-        <string>-api-key</string>
-        <string>%s</string>`, apiKey)
+		args = append(args, "-api-key", apiKey)
+	}
+	if spoolDir != "" && spoolDir != "./spool" {
+		args = append(args, "-spool", spoolDir)
+	}
+	if logFile != "" {
+		args = append(args, "-logfile", logFile)
+	}
+	if skipVerify {
+		args = append(args, "-skip-verify")
+	}
+
+	var argStrings string
+	for _, a := range args {
+		argStrings += fmt.Sprintf("\n        <string>%s</string>", a)
 	}
 
 	plist := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
@@ -34,16 +47,7 @@ func installService(serverURL, hostname string, interval, lookback time.Duration
     <key>Label</key>
     <string>%s</string>
     <key>ProgramArguments</key>
-    <array>
-        <string>%s</string>
-        <string>-server</string>
-        <string>%s</string>
-        <string>-hostname</string>
-        <string>%s</string>
-        <string>-interval</string>
-        <string>%s</string>
-        <string>-lookback</string>
-        <string>%s</string>%s
+    <array>%s
     </array>
     <key>RunAtLoad</key>
     <true/>
@@ -52,7 +56,7 @@ func installService(serverURL, hostname string, interval, lookback time.Duration
     <key>StandardErrorPath</key>
     <string>/var/log/osprey-agent.log</string>
 </dict>
-</plist>`, plistLabel, exe, serverURL, hostname, interval, lookback, apiKeyArgs)
+</plist>`, plistLabel, argStrings)
 
 	if err := os.WriteFile(plistPath(), []byte(plist), 0o644); err != nil {
 		return fmt.Errorf("write plist: %w", err)
@@ -72,3 +76,6 @@ func uninstallService() error {
 	}
 	return nil
 }
+
+func isWindowsService() bool                          { return false }
+func runWindowsService(func(ctx context.Context)) error { return nil }

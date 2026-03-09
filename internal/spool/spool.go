@@ -16,28 +16,28 @@ type Spool struct {
 	Dir string
 }
 
-// Save writes a report to the spool directory for later retry.
-func (s *Spool) Save(hostname string, report model.RunReport) error {
+// Save writes a submission to the spool directory for later retry.
+func (s *Spool) Save(hostname string, sub model.Submission) error {
 	if err := os.MkdirAll(s.Dir, 0o755); err != nil {
 		return fmt.Errorf("create spool dir: %w", err)
 	}
 
-	id := fmt.Sprintf("%s_%s", hostname, report.StartedAt.UTC().Format("20060102T150405Z"))
+	id := fmt.Sprintf("%s_%s", hostname, sub.ScannedAt.UTC().Format("20060102T150405Z"))
 	path := filepath.Join(s.Dir, id+".json")
 
-	data, err := json.Marshal(report)
+	data, err := json.Marshal(sub)
 	if err != nil {
-		return fmt.Errorf("marshal report: %w", err)
+		return fmt.Errorf("marshal submission: %w", err)
 	}
 
 	return os.WriteFile(path, data, 0o644)
 }
 
-// Entry is a spooled report with its file path.
+// Entry is a spooled submission with its file path.
 type Entry struct {
-	Path     string
-	Hostname string
-	Report   model.RunReport
+	Path       string
+	Hostname   string
+	Submission model.Submission
 }
 
 // List returns all spooled reports, oldest first.
@@ -62,8 +62,8 @@ func (s *Spool) List() ([]Entry, error) {
 			continue
 		}
 
-		var rr model.RunReport
-		if err := json.Unmarshal(data, &rr); err != nil {
+		var sub model.Submission
+		if err := json.Unmarshal(data, &sub); err != nil {
 			continue
 		}
 
@@ -73,14 +73,14 @@ func (s *Spool) List() ([]Entry, error) {
 		hostname := parts[0]
 
 		result = append(result, Entry{
-			Path:     path,
-			Hostname: hostname,
-			Report:   rr,
+			Path:       path,
+			Hostname:   hostname,
+			Submission: sub,
 		})
 	}
 
 	sort.Slice(result, func(i, j int) bool {
-		return result[i].Report.StartedAt.Before(result[j].Report.StartedAt)
+		return result[i].Submission.ScannedAt.Before(result[j].Submission.ScannedAt)
 	})
 
 	return result, nil

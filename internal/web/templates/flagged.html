@@ -1,0 +1,34 @@
+{{define "title"}} — Flagged Visits{{end}}
+
+{{define "content"}}
+<h1>Flagged Visits</h1>
+
+{{if .Visits}}
+<table class="data-table visit-table">
+  <thead>
+    <tr>
+      <th>Time</th>
+      <th>Hostname</th>
+      <th>URL</th>
+      <th>Title</th>
+      <th>Flags</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .Visits}}
+    <tr class="flagged-row">
+      <td>{{fmtTime .Time}}</td>
+      <td><a href="/hosts/{{.Hostname}}">{{.Hostname}}</a></td>
+      <td class="url-cell">{{truncate .URL 80}}</td>
+      <td>{{truncate .Title 50}}</td>
+      <td>
+        {{range .Flags}}<span class="badge badge-{{.Category}}">{{.Category}}</span> {{end}}
+      </td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{else}}
+<p class="empty-state">No flagged visits found.</p>
+{{end}}
+{{end}}

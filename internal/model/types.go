@@ -9,6 +9,7 @@ type Visit struct {
 	Title   string    `json:"title"`
 	Browser string    `json:"browser"`
 	DBPath  string    `json:"db_path"`
+	User    string    `json:"user,omitempty"`
 
 	Decoded []DecodedURL `json:"decoded,omitempty"`
 	Flags   []Flag       `json:"flags,omitempty"`
@@ -68,6 +69,33 @@ type RunReport struct {
 	StartedAt time.Time  `json:"started_at"`
 	Cutoff    time.Time  `json:"cutoff"`
 	DBReports []DBReport `json:"db_reports"`
+}
+
+// RawVisit is the minimal visit record sent by the agent.
+// No decoded or flag data — the server handles enrichment.
+type RawVisit struct {
+	Time    time.Time `json:"time"`
+	URL     string    `json:"url"`
+	Title   string    `json:"title"`
+	Browser string    `json:"browser"`
+	DBPath  string    `json:"db_path"`
+	User    string    `json:"user,omitempty"`
+}
+
+// RawIncognitoIndicator is an incognito indicator without decoded data.
+type RawIncognitoIndicator struct {
+	URL     string `json:"url"`
+	Browser string `json:"browser"`
+	DBPath  string `json:"db_path"`
+}
+
+// Submission is the payload the agent sends to the server.
+// Contains raw visit data — no decoding or flagging.
+type Submission struct {
+	Hostname            string                  `json:"hostname"`
+	ScannedAt           time.Time               `json:"scanned_at"`
+	Visits              []RawVisit              `json:"visits"`
+	IncognitoIndicators []RawIncognitoIndicator `json:"incognito_indicators,omitempty"`
 }
 
 // Config holds runtime configuration parsed from CLI flags.

@@ -6,14 +6,18 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
+	"github.com/watsoncj/osprey/internal/ingest"
 	"github.com/watsoncj/osprey/internal/model"
 	"github.com/watsoncj/osprey/internal/store"
+	"github.com/watsoncj/osprey/internal/web"
 )
 
 func main() {
-	listen := flag.String("listen", ":8080", "Address to listen on")
+	listen := flag.String("listen", ":9753", "Address to listen on")
 	dataDir := flag.String("data", "./data", "Directory to store reports")
 	certFile := flag.String("cert", "", "Path to TLS certificate file (enables HTTPS)")
 	keyFile := flag.String("key", "", "Path to TLS private key file")
@@ -41,11 +45,16 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	s := &store.Store{Dir: *dataDir}
+	pipeline := ingest.New()
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/reports", handlePost(s, *apiKey))
+	mux.HandleFunc("POST /api/visits", handlePostVisits(s, pipeline, *apiKey))
+	mux.HandleFunc("GET /api/visits", handleListVisits(s))
+	mux.HandleFunc("GET /api/hosts", handleListHosts(s))
+	mux.HandleFunc("POST /api/reports", handlePost(s, pipeline, *apiKey))
 	mux.HandleFunc("GET /api/reports", handleList(s))
 	mux.HandleFunc("GET /api/reports/{rest...}", handleGet(s))
+	mux.Handle("/", web.Handler(s))
 
 	log.Printf("Listening on %s (data: %s)", *listen, *dataDir)
 	if *certFile != "" && *keyFile != "" {
@@ -60,7 +69,147 @@ func main() {
 	}
 }
 
-func handlePost(s *store.Store, apiKey string) http.HandlerFunc {
+func handlePostVisits(s *store.Store, p *ingest.Pipeline, apiKey string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if apiKey != "" {
+			auth := r.Header.Get("Authorization")
+			if auth != "Bearer "+apiKey {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+		}
+
+		var sub model.Submission
+		if err := json.NewDecoder(r.Body).Decode(&sub); err != nil {
+			http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		hostname := r.Header.Get("X-Hostname")
+		if hostname == "" {
+			hostname = sub.Hostname
+		}
+		if hostname == "" {
+			http.Error(w, "missing hostname (set X-Hostname header or hostname in body)", http.StatusBadRequest)
+			return
+		}
+		sub.Hostname = hostname
+
+		enrichedVisits := p.ProcessVisits(sub.Visits)
+		enrichedIncognito := p.ProcessIncognito(sub.IncognitoIndicators)
+
+		newVisits, err := s.AppendVisits(hostname, enrichedVisits)
+		if err != nil {
+			log.Printf("append visits error: %v", err)
+			http.Error(w, "storage error", http.StatusInternalServerError)
+			return
+		}
+
+		if len(enrichedIncognito) > 0 {
+			if _, err := s.AppendIncognito(hostname, enrichedIncognito); err != nil {
+				log.Printf("append incognito error: %v", err)
+				http.Error(w, "storage error", http.StatusInternalServerError)
+				return
+			}
+		}
+
+		log.Printf("Stored %d new visits from %s", newVisits, hostname)
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]interface{}{"status": "ok", "new_visits": newVisits})
+	}
+}
+
+func handleListVisits(s *store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		hostname := q.Get("hostname")
+		if hostname == "" {
+			http.Error(w, "missing hostname query parameter", http.StatusBadRequest)
+			return
+		}
+
+		vq := store.VisitQuery{}
+
+		if v := q.Get("flagged"); v == "true" {
+			vq.FlaggedOnly = true
+		}
+		vq.Browser = q.Get("browser")
+		vq.User = q.Get("user")
+
+		if v := q.Get("since"); v != "" {
+			t, err := time.Parse(time.RFC3339, v)
+			if err != nil {
+				http.Error(w, "invalid since: "+err.Error(), http.StatusBadRequest)
+				return
+			}
+			vq.Since = t
+		}
+		if v := q.Get("until"); v != "" {
+			t, err := time.Parse(time.RFC3339, v)
+			if err != nil {
+				http.Error(w, "invalid until: "+err.Error(), http.StatusBadRequest)
+				return
+			}
+			vq.Until = t
+		}
+
+		limit := 100
+		if v := q.Get("limit"); v != "" {
+			n, err := strconv.Atoi(v)
+			if err != nil {
+				http.Error(w, "invalid limit: "+err.Error(), http.StatusBadRequest)
+				return
+			}
+			limit = n
+		}
+		vq.Limit = limit
+
+		if v := q.Get("offset"); v != "" {
+			n, err := strconv.Atoi(v)
+			if err != nil {
+				http.Error(w, "invalid offset: "+err.Error(), http.StatusBadRequest)
+				return
+			}
+			vq.Offset = n
+		}
+
+		visits, err := s.LoadVisits(hostname, vq)
+		if err != nil {
+			log.Printf("load visits error: %v", err)
+			http.Error(w, "storage error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(visits)
+	}
+}
+
+func handleListHosts(s *store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		hosts, err := s.ListHosts()
+		if err != nil {
+			log.Printf("list hosts error: %v", err)
+			http.Error(w, "storage error", http.StatusInternalServerError)
+			return
+		}
+
+		var stats []store.HostStats
+		for _, h := range hosts {
+			hs, err := s.HostStats(h)
+			if err != nil {
+				log.Printf("host stats error for %s: %v", h, err)
+				continue
+			}
+			stats = append(stats, hs)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(stats)
+	}
+}
+
+func handlePost(s *store.Store, p *ingest.Pipeline, apiKey string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if apiKey != "" {
 			auth := r.Header.Get("Authorization")
@@ -87,13 +236,35 @@ func handlePost(s *store.Store, apiKey string) http.HandlerFunc {
 
 		rr.Hostname = hostname
 
-		if err := s.Save(hostname, rr); err != nil {
-			log.Printf("save error: %v", err)
-			http.Error(w, "storage error", http.StatusInternalServerError)
-			return
+		var rawVisits []model.RawVisit
+		var rawIncognito []model.RawIncognitoIndicator
+		for _, db := range rr.DBReports {
+			for _, v := range db.Visits {
+				rawVisits = append(rawVisits, model.RawVisit{
+					Time: v.Time, URL: v.URL, Title: v.Title, Browser: v.Browser, DBPath: v.DBPath,
+				})
+			}
+			for _, ind := range db.IncognitoIndicators {
+				rawIncognito = append(rawIncognito, model.RawIncognitoIndicator{
+					URL: ind.URL, Browser: ind.Browser, DBPath: ind.DBPath,
+				})
+			}
 		}
 
-		log.Printf("Stored report from %s", hostname)
+		enrichedVisits := p.ProcessVisits(rawVisits)
+		enrichedIncognito := p.ProcessIncognito(rawIncognito)
+
+		newVisits, err := s.AppendVisits(hostname, enrichedVisits)
+		if err != nil {
+			log.Printf("append visits error (legacy): %v", err)
+		}
+		if len(enrichedIncognito) > 0 {
+			if _, err := s.AppendIncognito(hostname, enrichedIncognito); err != nil {
+				log.Printf("append incognito error (legacy): %v", err)
+			}
+		}
+
+		log.Printf("legacy report endpoint used: stored report from %s (%d new visits)", hostname, newVisits)
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 	}
