@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 )
@@ -26,6 +27,17 @@ func installService(listen, dataDir, apiKey string) error {
 	)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("sc create: %s: %w", out, err)
+	}
+
+	// Configure recovery: restart after 10s/30s/60s, including on clean exit
+	// (needed for self-update which exits with code 0).
+	cmd = exec.Command("sc", "failure", serviceName, "reset=", "3600", "actions=", "restart/10000/restart/30000/restart/60000")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		log.Printf("Warning: sc failure config: %s: %v", out, err)
+	}
+	cmd = exec.Command("sc", "failureflag", serviceName, "1")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		log.Printf("Warning: sc failureflag: %s: %v", out, err)
 	}
 
 	cmd = exec.Command("sc", "start", serviceName)

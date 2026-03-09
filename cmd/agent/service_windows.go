@@ -100,6 +100,21 @@ func installService(serverURL, hostname string, interval, lookback time.Duration
 	}
 	defer s.Close()
 
+	// Restart the service after 10 seconds if it exits for any reason
+	// (including clean exit from self-update).
+	if err := s.SetRecoveryActions([]mgr.RecoveryAction{
+		{Type: mgr.ServiceRestart, Delay: 10 * time.Second},
+		{Type: mgr.ServiceRestart, Delay: 30 * time.Second},
+		{Type: mgr.ServiceRestart, Delay: 60 * time.Second},
+	}, 3600); err != nil {
+		log.Printf("Warning: could not set recovery actions: %v", err)
+	}
+	// Apply recovery actions even on clean (non-crash) exits so that
+	// self-update can exit(0) and the SCM restarts the new binary.
+	if err := s.SetRecoveryActionsOnNonCrashFailures(true); err != nil {
+		log.Printf("Warning: could not enable recovery on non-crash failures: %v", err)
+	}
+
 	if err := s.Start(); err != nil {
 		return fmt.Errorf("start service: %w", err)
 	}
