@@ -1,0 +1,91 @@
+{{define "title"}} — {{.Hostname}}{{end}}
+
+{{define "content"}}
+<nav class="breadcrumb">
+  <a href="/">Dashboard</a><span>{{.Hostname}}</span>
+</nav>
+
+<h1>{{.Hostname}}</h1>
+
+<div class="host-stats">
+  <dl>
+    <dt>Total Visits</dt><dd>{{.Stats.TotalVisits}}</dd>
+    <dt>Flagged</dt><dd{{if gt .Stats.FlaggedVisits 0}} class="flagged"{{end}}>{{.Stats.FlaggedVisits}}</dd>
+    <dt>Latest</dt><dd>{{if .Stats.LatestVisit.IsZero}}—{{else}}{{fmtTime .Stats.LatestVisit}}{{end}}</dd>
+  </dl>
+  {{if .Incognito}}<p><a href="/hosts/{{.Hostname}}/incognito">{{len .Incognito}} incognito indicator(s)</a></p>{{end}}
+</div>
+
+<form class="filter-bar" method="get" action="/hosts/{{.Hostname}}" id="filters">
+  <button type="button" class="toggle-btn{{if .Query.FlaggedOnly}} active{{end}}" id="flagged-toggle">Flagged only</button>
+  <input type="hidden" name="flagged" id="flagged-val" value="{{if .Query.FlaggedOnly}}true{{end}}">
+  {{if .Stats.Users}}
+  <select name="user" onchange="this.form.submit()">
+    <option value="">All users</option>
+    {{range .Stats.Users}}
+    <option value="{{.}}"{{if eq $.Query.User .}} selected{{end}}>{{.}}</option>
+    {{end}}
+  </select>
+  {{end}}
+  <select name="browser" onchange="this.form.submit()">
+    <option value="">All browsers</option>
+    <option value="Chrome"{{if eq .Query.Browser "Chrome"}} selected{{end}}>Chrome</option>
+    <option value="Edge"{{if eq .Query.Browser "Edge"}} selected{{end}}>Edge</option>
+    <option value="Brave"{{if eq .Query.Browser "Brave"}} selected{{end}}>Brave</option>
+    <option value="Firefox"{{if eq .Query.Browser "Firefox"}} selected{{end}}>Firefox</option>
+    <option value="Safari"{{if eq .Query.Browser "Safari"}} selected{{end}}>Safari</option>
+  </select>
+  <input type="date" name="since" value="{{.Query.Since}}" onchange="this.form.submit()">
+  <input type="date" name="until" value="{{.Query.Until}}" onchange="this.form.submit()">
+</form>
+<script>
+(function(){
+  var btn = document.getElementById('flagged-toggle');
+  var val = document.getElementById('flagged-val');
+  btn.addEventListener('click', function(){
+    val.value = val.value === 'true' ? '' : 'true';
+    btn.classList.toggle('active');
+    document.getElementById('filters').submit();
+  });
+})();
+</script>
+
+{{if .Visits}}
+<table class="data-table visit-table">
+  <thead>
+    <tr>
+      <th>Time</th>
+      <th>URL</th>
+      <th>Title</th>
+      <th>Browser</th>
+      <th>Flags</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .Visits}}
+    <tr{{if hasFlags .}} class="flagged-row"{{end}}>
+      <td>{{fmtTime .Time}}</td>
+      <td class="url-cell">{{truncate .URL 80}}</td>
+      <td>{{truncate .Title 50}}</td>
+      <td>{{.Browser}}</td>
+      <td>
+        {{range .Flags}}<span class="badge badge-{{.Category}}">{{.Category}}</span> {{end}}
+      </td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+
+<div class="pagination">
+  {{if gt .Query.Page 1}}
+  <a href="?page={{add .Query.Page -1}}{{if .Query.FlaggedOnly}}&flagged=true{{end}}{{if .Query.User}}&user={{.Query.User}}{{end}}{{if .Query.Browser}}&browser={{.Query.Browser}}{{end}}{{if .Query.Since}}&since={{.Query.Since}}{{end}}{{if .Query.Until}}&until={{.Query.Until}}{{end}}">&laquo; Previous</a>
+  {{end}}
+  <span>Page {{.Query.Page}}</span>
+  {{if .Query.HasMore}}
+  <a href="?page={{add .Query.Page 1}}{{if .Query.FlaggedOnly}}&flagged=true{{end}}{{if .Query.User}}&user={{.Query.User}}{{end}}{{if .Query.Browser}}&browser={{.Query.Browser}}{{end}}{{if .Query.Since}}&since={{.Query.Since}}{{end}}{{if .Query.Until}}&until={{.Query.Until}}{{end}}">Next &raquo;</a>
+  {{end}}
+</div>
+{{else}}
+<p class="empty-state">No visits match the current filters.</p>
+{{end}}
+{{end}}

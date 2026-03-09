@@ -1,0 +1,42 @@
+{{define "title"}} — {{.Hostname}} — Incognito{{end}}
+
+{{define "content"}}
+<nav class="breadcrumb">
+  <a href="/">Dashboard</a>
+  <a href="/hosts/{{.Hostname}}">{{.Hostname}}</a>
+  <span>Incognito Indicators</span>
+</nav>
+
+<h1>Incognito Indicators — {{.Hostname}}</h1>
+<p>URLs found in Favicons DB but absent from History ({{len .Indicators}} total)</p>
+
+{{if .Indicators}}
+<table class="data-table">
+  <thead>
+    <tr>
+      <th>URL</th>
+      <th>Browser</th>
+      <th>Decoded Data</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .Indicators}}
+    <tr>
+      <td class="url-cell">{{truncate .URL 80}}</td>
+      <td>{{.Browser}}</td>
+      <td>
+        {{range .Decoded}}
+        {{$decoder := .Decoder}}
+        {{range $k, $v := .Data}}
+        <span class="decoded-tag">{{$decoder}}.{{$k}}: {{$v}}</span>
+        {{end}}
+        {{end}}
+      </td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{else}}
+<p class="empty-state">No incognito indicators found.</p>
+{{end}}
+{{end}}

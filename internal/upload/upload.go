@@ -11,7 +11,7 @@ import (
 	"github.com/watsoncj/osprey/internal/model"
 )
 
-// InsecureClient returns an *http.Client that skips TLS certificate verification.
+// InsecureClient returns an HTTP client that skips TLS certificate verification.
 func InsecureClient() *http.Client {
 	return &http.Client{
 		Transport: &http.Transport{
@@ -20,16 +20,16 @@ func InsecureClient() *http.Client {
 	}
 }
 
-// Upload POSTs a RunReport as JSON to the server's /api/reports endpoint.
-// The hostname is sent in the X-Hostname header.
-// If client is nil, http.DefaultClient is used.
-func Upload(ctx context.Context, serverURL, hostname string, report model.RunReport, apiKey string, client *http.Client) error {
-	body, err := json.Marshal(report)
+// Upload POSTs a Submission as JSON to the server's /api/visits endpoint.
+// The hostname is sent in the X-Hostname header. If client is nil,
+// http.DefaultClient is used.
+func Upload(ctx context.Context, serverURL, hostname string, sub model.Submission, apiKey string, client *http.Client) error {
+	body, err := json.Marshal(sub)
 	if err != nil {
-		return fmt.Errorf("marshal report: %w", err)
+		return fmt.Errorf("marshal submission: %w", err)
 	}
 
-	url := serverURL + "/api/reports"
+	url := serverURL + "/api/visits"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)

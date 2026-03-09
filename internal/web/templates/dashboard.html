@@ -1,0 +1,32 @@
+{{define "title"}} — Dashboard{{end}}
+
+{{define "content"}}
+<h1>Dashboard</h1>
+
+{{if .Hosts}}
+<table class="data-table">
+  <thead>
+    <tr>
+      <th>Hostname</th>
+      <th>Total Visits</th>
+      <th>Flagged</th>
+      <th>Latest Activity</th>
+      <th>Top Category</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .Hosts}}
+    <tr>
+      <td><a href="/hosts/{{.Hostname}}">{{.Hostname}}</a></td>
+      <td>{{.TotalVisits}}</td>
+      <td{{if gt .FlaggedVisits 0}} class="flagged"{{end}}>{{.FlaggedVisits}}</td>
+      <td>{{if .LatestVisit.IsZero}}—{{else}}{{fmtTime .LatestVisit}}{{end}}</td>
+      <td>{{topCategory .CategoryCounts}}</td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{else}}
+<p class="empty-state">No visits received yet.</p>
+{{end}}
+{{end}}
