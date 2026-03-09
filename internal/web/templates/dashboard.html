@@ -21,7 +21,7 @@
       <td><a href="/hosts/{{.Hostname}}">{{.Hostname}}</a></td>
       <td>{{if .AgentVersion}}{{.AgentVersion}}{{else}}—{{end}}</td>
       <td>{{.TotalVisits}}</td>
-      <td{{if gt .FlaggedVisits 0}} class="flagged"{{end}}>{{.FlaggedVisits}}</td>
+      <td{{if gt .FlaggedVisits 0}} class="flagged"{{end}}>{{.FlaggedVisits}}{{if gt .DismissedFlaggedVisits 0}} <span class="text-muted">({{.DismissedFlaggedVisits}} dismissed)</span>{{end}}</td>
       <td>{{if .LatestVisit.IsZero}}—{{else}}{{fmtTime .LatestVisit}}{{end}}</td>
       <td>{{topCategory .CategoryCounts}}</td>
     </tr>

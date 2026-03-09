@@ -53,6 +53,9 @@ var funcMap = template.FuncMap{
 		}
 		return best
 	},
+	"visitKey": func(v model.Visit) string {
+		return store.VisitKey(v.URL, v.Time, v.Browser)
+	},
 	"add":            func(a, b int) int { return a + b },
 	"uniqueCategories": func(flags []model.Flag) []string {
 		seen := make(map[string]bool)
@@ -94,18 +97,20 @@ type hostDetailData struct {
 }
 
 type queryParams struct {
-	FlaggedOnly bool
-	Browser     string
-	User        string
-	Since       string
-	Until       string
-	Page        int
-	PageSize    int
-	HasMore     bool
+	FlaggedOnly  bool
+	Browser      string
+	User         string
+	Since        string
+	Until        string
+	Page         int
+	PageSize     int
+	HasMore      bool
+	ShowDismissed bool
 }
 
 type flaggedData struct {
-	Visits []visitWithHost
+	Visits        []visitWithHost
+	ShowDismissed bool
 }
 
 type visitWithHost struct {
@@ -129,6 +134,7 @@ func Handler(s *store.Store) http.Handler {
 	mux.HandleFunc("GET /hosts/{hostname}", handleHost(s))
 	mux.HandleFunc("GET /flagged", handleFlagged(s))
 	mux.HandleFunc("GET /hosts/{hostname}/incognito", handleIncognito(s))
+	mux.HandleFunc("POST /hosts/{hostname}/dismiss", handleDismissWeb(s))
 
 	return mux
 }
@@ -173,6 +179,7 @@ func handleHost(s *store.Store) http.HandlerFunc {
 		userFilter := q.Get("user")
 		since := q.Get("since")
 		until := q.Get("until")
+		showDismissed := q.Get("show_dismissed") == "true"
 		page, _ := strconv.Atoi(q.Get("page"))
 		if page < 1 {
 			page = 1
@@ -183,11 +190,12 @@ func handleHost(s *store.Store) http.HandlerFunc {
 		}
 
 		vq := store.VisitQuery{
-			FlaggedOnly: flaggedOnly,
-			Browser:     browser,
-			User:        userFilter,
-			Limit:       pageSize + 1,
-			Offset:      (page - 1) * pageSize,
+			FlaggedOnly:  flaggedOnly,
+			Browser:      browser,
+			User:         userFilter,
+			ShowDismissed: showDismissed,
+			Limit:        pageSize + 1,
+			Offset:       (page - 1) * pageSize,
 		}
 
 		if since != "" {
@@ -239,9 +247,10 @@ func handleHost(s *store.Store) http.HandlerFunc {
 				User:        userFilter,
 				Since:       since,
 				Until:       until,
-				Page:        page,
-				PageSize:    pageSize,
-				HasMore:     hasMore,
+				Page:          page,
+				PageSize:      pageSize,
+				HasMore:       hasMore,
+				ShowDismissed: showDismissed,
 			},
 		}); err != nil {
 			log.Printf("error executing host template: %v", err)
@@ -251,6 +260,8 @@ func handleHost(s *store.Store) http.HandlerFunc {
 
 func handleFlagged(s *store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		showDismissed := r.URL.Query().Get("show_dismissed") == "true"
+
 		hosts, err := s.ListHosts()
 		if err != nil {
 			log.Printf("error listing hosts: %v", err)
@@ -260,7 +271,7 @@ func handleFlagged(s *store.Store) http.HandlerFunc {
 
 		var all []visitWithHost
 		for _, hostname := range hosts {
-			visits, err := s.LoadVisits(hostname, store.VisitQuery{FlaggedOnly: true, Limit: 100})
+			visits, err := s.LoadVisits(hostname, store.VisitQuery{FlaggedOnly: true, ShowDismissed: showDismissed, Limit: 100})
 			if err != nil {
 				log.Printf("error loading flagged visits for %s: %v", hostname, err)
 				continue
@@ -279,9 +290,34 @@ func handleFlagged(s *store.Store) http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		if err := flaggedTmpl.ExecuteTemplate(w, "layout", flaggedData{Visits: all}); err != nil {
+		if err := flaggedTmpl.ExecuteTemplate(w, "layout", flaggedData{Visits: all, ShowDismissed: showDismissed}); err != nil {
 			log.Printf("error executing flagged template: %v", err)
 		}
+	}
+}
+
+func handleDismissWeb(s *store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		hostname := r.PathValue("hostname")
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "bad form", http.StatusBadRequest)
+			return
+		}
+		visitKey := r.FormValue("visit_key")
+		action := r.FormValue("action")
+
+		dismissed := action == "dismiss"
+		if err := s.SetVisitDismissed(hostname, visitKey, dismissed); err != nil {
+			log.Printf("dismiss error: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		referer := r.Header.Get("Referer")
+		if referer == "" {
+			referer = "/hosts/" + hostname
+		}
+		http.Redirect(w, r, referer, http.StatusSeeOther)
 	}
 }
 

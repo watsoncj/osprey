@@ -118,11 +118,20 @@ h3 { font-size: 1.15em; }
 }
 
 .nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   font-weight: 700;
   font-size: 1.1em;
   color: var(--navbar-text);
   text-decoration: none;
   letter-spacing: 0.02em;
+}
+
+.nav-logo {
+  height: 2.5rem;
+  width: 2.5rem;
+  filter: invert(1);
 }
 
 .nav-brand:hover {
@@ -391,6 +400,58 @@ h3 { font-size: 1.15em; }
 
 .decoded-list li:last-child {
   border-bottom: none;
+}
+
+/* ---- Dismiss Feature ---- */
+
+.dismissed-row {
+  opacity: 0.5;
+}
+
+.dismissed-row:hover {
+  opacity: 0.75;
+}
+
+.badge-dismissed {
+  background: var(--text-muted);
+  color: #fff;
+}
+
+.inline-form {
+  display: inline;
+}
+
+.btn-sm {
+  font-size: 0.75em;
+  padding: 0.15em 0.5em;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.btn-sm:hover {
+  background: var(--table-hover);
+}
+
+.btn-dismiss {
+  color: var(--text-muted);
+}
+
+.btn-restore {
+  color: var(--link);
+}
+
+.dismiss-controls {
+  padding: 0.5rem 0;
+  font-size: 0.9em;
+}
+
+.text-muted {
+  color: var(--text-muted);
+  font-size: 0.85em;
+  font-weight: normal;
 }
 
 /* ---- Responsive ---- */

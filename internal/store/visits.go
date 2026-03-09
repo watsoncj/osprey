@@ -15,31 +15,38 @@ import (
 
 // VisitQuery holds optional filters for loading visits.
 type VisitQuery struct {
-	Since       time.Time
-	Until       time.Time
-	FlaggedOnly bool
-	Browser     string
-	User        string
-	Limit       int
-	Offset      int
+	Since         time.Time
+	Until         time.Time
+	FlaggedOnly   bool
+	ShowDismissed bool
+	Browser       string
+	User          string
+	Limit         int
+	Offset        int
 }
 
 // HostStats holds aggregate statistics for a hostname.
 type HostStats struct {
-	Hostname       string              `json:"hostname"`
-	AgentVersion   string              `json:"agent_version,omitempty"`
-	TotalVisits    int                 `json:"total_visits"`
-	FlaggedVisits  int                 `json:"flagged_visits"`
-	LatestVisit    time.Time           `json:"latest_visit"`
-	CategoryCounts map[string]int      `json:"category_counts,omitempty"`
-	TopDomains     []model.DomainCount `json:"top_domains,omitempty"`
-	Users          []string            `json:"users,omitempty"`
+	Hostname              string              `json:"hostname"`
+	AgentVersion          string              `json:"agent_version,omitempty"`
+	TotalVisits           int                 `json:"total_visits"`
+	FlaggedVisits         int                 `json:"flagged_visits"`
+	DismissedFlaggedVisits int               `json:"dismissed_flagged_visits,omitempty"`
+	LatestVisit           time.Time           `json:"latest_visit"`
+	CategoryCounts        map[string]int      `json:"category_counts,omitempty"`
+	TopDomains            []model.DomainCount `json:"top_domains,omitempty"`
+	Users                 []string            `json:"users,omitempty"`
 }
 
 // HostMeta holds per-host metadata persisted to meta.json.
 type HostMeta struct {
 	AgentVersion string    `json:"agent_version"`
 	LastSeen     time.Time `json:"last_seen"`
+}
+
+// VisitKey computes the deduplication key for a visit.
+func VisitKey(url string, t time.Time, browser string) string {
+	return fmt.Sprintf("%s|%d|%s", url, t.UnixNano(), browser)
 }
 
 // SaveHostMeta writes agent metadata for a hostname.
@@ -95,7 +102,7 @@ func (s *Store) AppendVisits(hostname string, visits []model.Visit) (int, error)
 
 	count := 0
 	for _, v := range visits {
-		key := fmt.Sprintf("%s|%d|%s", v.URL, v.Time.UnixNano(), v.Browser)
+		key := VisitKey(v.URL, v.Time, v.Browser)
 		if existing[key] {
 			continue
 		}
@@ -177,6 +184,64 @@ func (s *Store) ListHosts() ([]string, error) {
 	return hosts, nil
 }
 
+// LoadDismissals reads the dismissal state for a hostname.
+// Returns a map of visit key → dismissed (last event wins).
+func (s *Store) LoadDismissals(hostname string) (map[string]bool, error) {
+	path := filepath.Join(s.Dir, hostname, "dismissals.jsonl")
+	events, err := readJSONL[model.DismissalEvent](path)
+	if err != nil {
+		return nil, err
+	}
+	state := make(map[string]bool, len(events))
+	for _, e := range events {
+		if e.Dismissed {
+			state[e.VisitKey] = true
+		} else {
+			delete(state, e.VisitKey)
+		}
+	}
+	return state, nil
+}
+
+// SetVisitDismissed appends a dismissal event for a visit.
+// No-op if the current state already matches.
+func (s *Store) SetVisitDismissed(hostname, visitKey string, dismissed bool) error {
+	dir := filepath.Join(s.Dir, hostname)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("create dir: %w", err)
+	}
+
+	current, err := s.LoadDismissals(hostname)
+	if err != nil {
+		return err
+	}
+	if current[visitKey] == dismissed {
+		return nil
+	}
+
+	event := model.DismissalEvent{
+		VisitKey:  visitKey,
+		Dismissed: dismissed,
+		UpdatedAt: time.Now().UTC(),
+	}
+	data, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("marshal dismissal: %w", err)
+	}
+
+	path := filepath.Join(dir, "dismissals.jsonl")
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return fmt.Errorf("open dismissals file: %w", err)
+	}
+	defer f.Close()
+
+	if _, err := f.Write(append(data, '\n')); err != nil {
+		return fmt.Errorf("write dismissal: %w", err)
+	}
+	return nil
+}
+
 // LoadVisits reads visits for a hostname, applies filters from VisitQuery,
 // sorts newest first, and applies offset/limit.
 func (s *Store) LoadVisits(hostname string, q VisitQuery) ([]model.Visit, error) {
@@ -187,8 +252,17 @@ func (s *Store) LoadVisits(hostname string, q VisitQuery) ([]model.Visit, error)
 		return nil, err
 	}
 
+	dismissed, err := s.LoadDismissals(hostname)
+	if err != nil {
+		return nil, err
+	}
+
 	var filtered []model.Visit
 	for _, v := range visits {
+		key := VisitKey(v.URL, v.Time, v.Browser)
+		if dismissed[key] {
+			v.Dismissed = true
+		}
 		if !q.Since.IsZero() && v.Time.Before(q.Since) {
 			continue
 		}
@@ -196,6 +270,9 @@ func (s *Store) LoadVisits(hostname string, q VisitQuery) ([]model.Visit, error)
 			continue
 		}
 		if q.FlaggedOnly && len(v.Flags) == 0 {
+			continue
+		}
+		if q.FlaggedOnly && v.Dismissed && !q.ShowDismissed {
 			continue
 		}
 		if q.Browser != "" && v.Browser != q.Browser {
@@ -238,7 +315,7 @@ func (s *Store) HostStats(hostname string) (HostStats, error) {
 		stats.AgentVersion = meta.AgentVersion
 	}
 
-	visits, err := s.LoadVisits(hostname, VisitQuery{})
+	visits, err := s.LoadVisits(hostname, VisitQuery{ShowDismissed: true})
 	if err != nil {
 		return stats, err
 	}
@@ -253,7 +330,11 @@ func (s *Store) HostStats(hostname string) (HostStats, error) {
 
 	for _, v := range visits {
 		if len(v.Flags) > 0 {
-			stats.FlaggedVisits++
+			if v.Dismissed {
+				stats.DismissedFlaggedVisits++
+			} else {
+				stats.FlaggedVisits++
+			}
 			for _, f := range v.Flags {
 				stats.CategoryCounts[f.Category]++
 			}
@@ -343,7 +424,7 @@ func loadVisitKeys(path string) (map[string]bool, error) {
 	}
 	keys := make(map[string]bool, len(visits))
 	for _, v := range visits {
-		key := fmt.Sprintf("%s|%d|%s", v.URL, v.Time.UnixNano(), v.Browser)
+		key := VisitKey(v.URL, v.Time, v.Browser)
 		keys[key] = true
 	}
 	return keys, nil

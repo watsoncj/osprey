@@ -9,7 +9,8 @@ type Visit struct {
 	Title   string    `json:"title"`
 	Browser string    `json:"browser"`
 	DBPath  string    `json:"db_path"`
-	User    string    `json:"user,omitempty"`
+	User      string `json:"user,omitempty"`
+	Dismissed bool   `json:"dismissed,omitempty"`
 
 	Decoded []DecodedURL `json:"decoded,omitempty"`
 	Flags   []Flag       `json:"flags,omitempty"`
@@ -97,6 +98,13 @@ type Submission struct {
 	ScannedAt           time.Time               `json:"scanned_at"`
 	Visits              []RawVisit              `json:"visits"`
 	IncognitoIndicators []RawIncognitoIndicator `json:"incognito_indicators,omitempty"`
+}
+
+// DismissalEvent records a dismiss or restore action on a flagged visit.
+type DismissalEvent struct {
+	VisitKey  string    `json:"visit_key"`
+	Dismissed bool      `json:"dismissed"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // Config holds runtime configuration parsed from CLI flags.

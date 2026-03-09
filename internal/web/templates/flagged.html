@@ -3,6 +3,14 @@
 {{define "content"}}
 <h1>Flagged Visits</h1>
 
+<div class="dismiss-controls">
+  {{if .ShowDismissed}}
+  <a href="/flagged">Hide dismissed</a>
+  {{else}}
+  <a href="/flagged?show_dismissed=true">Show dismissed</a>
+  {{end}}
+</div>
+
 {{if .Visits}}
 <table class="data-table visit-table">
   <thead>
@@ -16,13 +24,24 @@
   </thead>
   <tbody>
     {{range .Visits}}
-    <tr class="flagged-row">
+    <tr{{if .Dismissed}} class="dismissed-row"{{else}} class="flagged-row"{{end}}>
       <td>{{fmtTime .Time}}</td>
       <td><a href="/hosts/{{.Hostname}}">{{.Hostname}}</a></td>
       <td class="url-cell">{{truncate .URL 80}}</td>
       <td>{{truncate .Title 50}}</td>
       <td>
+        {{if .Dismissed}}<span class="badge badge-dismissed">Dismissed</span> {{end}}
         {{range uniqueCategories .Flags}}<span class="badge badge-{{.}}">{{.}}</span> {{end}}
+        <form method="post" action="/hosts/{{.Hostname}}/dismiss" class="inline-form">
+          <input type="hidden" name="visit_key" value="{{visitKey .Visit}}">
+          {{if .Dismissed}}
+          <input type="hidden" name="action" value="restore">
+          <button type="submit" class="btn-sm btn-restore">Restore</button>
+          {{else}}
+          <input type="hidden" name="action" value="dismiss">
+          <button type="submit" class="btn-sm btn-dismiss">Dismiss</button>
+          {{end}}
+        </form>
       </td>
     </tr>
     {{end}}

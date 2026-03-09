@@ -238,3 +238,57 @@ Report the agent's build version to the server so operators can see which versio
 
 - [x] **8.5 — Display agent version on dashboard**
   Add an "Agent Version" column to the dashboard table in `templates/dashboard.html`.
+
+### Phase 9: Dismiss Flagged Visits
+
+Allow operators to dismiss flagged visits from the web UI so reviewed items no longer clutter the active flagged view. Dismissals are stored as an append-only overlay alongside visits — no in-place mutation. Restore (undo) is supported.
+
+#### 9.1 — Dismissal storage (`internal/store`)
+
+- [x] **9.1.1 — Add `DismissalEvent` type to `internal/model/types.go`**
+  New type with `VisitKey`, `Dismissed` (bool), and `UpdatedAt` fields.
+
+- [x] **9.1.2 — Extract `VisitKey` helper in `internal/store/visits.go`**
+  Replace the inline `fmt.Sprintf("%s|%d|%s", ...)` used in `AppendVisits` and `loadVisitKeys` with a shared `VisitKey(url string, t time.Time, browser string) string` function.
+
+- [x] **9.1.3 — Add dismissal store methods to `internal/store/visits.go`**
+  - `SetVisitDismissed(hostname, visitKey string, dismissed bool) error` — appends a `DismissalEvent` to `{data_dir}/{hostname}/dismissals.jsonl`. No-op if current state already matches.
+  - `LoadDismissals(hostname string) (map[string]bool, error)` — reads `dismissals.jsonl`, returns map of visit key → dismissed (last event wins).
+
+- [x] **9.1.4 — Add `Dismissed` field to `model.Visit`**
+  Read-time computed field, not persisted in `visits.jsonl`.
+
+- [x] **9.1.5 — Populate `Dismissed` in `LoadVisits`**
+  After loading visits, load the dismissal map and set `v.Dismissed = true` for matching keys. Add `ShowDismissed bool` to `VisitQuery`. When `FlaggedOnly` is true and `ShowDismissed` is false (default), filter out dismissed visits.
+
+- [x] **9.1.6 — Update `HostStats` with dismissed counts**
+  Add `DismissedFlaggedVisits int` to `HostStats`. `FlaggedVisits` reflects only non-dismissed flagged visits.
+
+#### 9.2 — API endpoint (`cmd/server`)
+
+- [x] **9.2.1 — Add `POST /api/hosts/{hostname}/dismissals` endpoint**
+  Request body: `{"url": "...", "time": "RFC3339Nano", "browser": "...", "dismissed": true}`. Server computes the visit key from the fields and calls `store.SetVisitDismissed`.
+
+- [x] **9.2.2 — Wire the endpoint into `cmd/server/main.go`**
+
+#### 9.3 — Web UI changes (`internal/web`)
+
+- [x] **9.3.1 — Add dismiss/restore form handler (`POST /hosts/{hostname}/dismiss`)**
+  HTML form POST handler. Accepts `visit_key` and `action` (dismiss/restore), redirects back to referring page.
+
+- [x] **9.3.2 — Update host detail page (`host.html`)**
+  Dismiss/restore buttons on flagged rows, `show_dismissed` toggle, muted styling for dismissed rows.
+
+- [x] **9.3.3 — Update flagged page (`flagged.html`)**
+  Hide dismissed by default, show/hide toggle, dismiss/restore buttons, "Dismissed" badge.
+
+- [x] **9.3.4 — Update dashboard (`dashboard.html`)**
+  Show dismissed count as secondary text next to flagged count.
+
+- [x] **9.3.5 — Add `visitKey` template function**
+  Computes the visit key from a `Visit` for use in hidden form fields.
+
+- [x] **9.3.6 — Add CSS for dismissed state**
+  `.dismissed-row`, `.badge-dismissed`, `.btn-sm`, `.btn-dismiss`, `.btn-restore` styles.
+
+- [x] **9.4.1 — Register dismiss POST route in `web.Handler`**

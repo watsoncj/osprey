@@ -97,6 +97,7 @@ func main() {
 	mux.HandleFunc("POST /api/visits", handlePostVisits(s, pipeline, *apiKey))
 	mux.HandleFunc("GET /api/visits", handleListVisits(s))
 	mux.HandleFunc("GET /api/hosts", handleListHosts(s))
+	mux.HandleFunc("POST /api/hosts/{hostname}/dismissals", handleDismiss(s))
 	mux.HandleFunc("POST /api/reports", handlePost(s, pipeline, *apiKey))
 	mux.HandleFunc("GET /api/reports", handleList(s))
 	mux.HandleFunc("GET /api/reports/{rest...}", handleGet(s))
@@ -258,6 +259,33 @@ func handleListHosts(s *store.Store) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(stats)
+	}
+}
+
+func handleDismiss(s *store.Store) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		hostname := r.PathValue("hostname")
+
+		var req struct {
+			URL       string    `json:"url"`
+			Time      time.Time `json:"time"`
+			Browser   string    `json:"browser"`
+			Dismissed bool      `json:"dismissed"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		key := store.VisitKey(req.URL, req.Time, req.Browser)
+		if err := s.SetVisitDismissed(hostname, key, req.Dismissed); err != nil {
+			log.Printf("dismiss error: %v", err)
+			http.Error(w, "storage error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 	}
 }
 
