@@ -53,7 +53,18 @@ var funcMap = template.FuncMap{
 		}
 		return best
 	},
-	"add": func(a, b int) int { return a + b },
+	"add":            func(a, b int) int { return a + b },
+	"uniqueCategories": func(flags []model.Flag) []string {
+		seen := make(map[string]bool)
+		var cats []string
+		for _, f := range flags {
+			if !seen[f.Category] {
+				seen[f.Category] = true
+				cats = append(cats, f.Category)
+			}
+		}
+		return cats
+	},
 }
 
 var (

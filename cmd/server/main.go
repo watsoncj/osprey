@@ -102,7 +102,7 @@ func main() {
 	mux.HandleFunc("GET /api/reports/{rest...}", handleGet(s))
 	mux.Handle("/", web.Handler(s))
 
-	log.Printf("Listening on %s (data: %s)", *listen, *dataDir)
+	log.Printf("Listening on %s (data: %s) version=%s", *listen, *dataDir, buildinfo.Version)
 	if *certFile != "" && *keyFile != "" {
 		log.Printf("TLS enabled")
 		if err := http.ListenAndServeTLS(*listen, *certFile, *keyFile, mux); err != nil {

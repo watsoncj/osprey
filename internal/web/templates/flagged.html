@@ -22,7 +22,7 @@
       <td class="url-cell">{{truncate .URL 80}}</td>
       <td>{{truncate .Title 50}}</td>
       <td>
-        {{range .Flags}}<span class="badge badge-{{.Category}}">{{.Category}}</span> {{end}}
+        {{range uniqueCategories .Flags}}<span class="badge badge-{{.}}">{{.}}</span> {{end}}
       </td>
     </tr>
     {{end}}
