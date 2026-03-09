@@ -53,7 +53,11 @@ func ScanRaw(ctx context.Context, cfg Config, allBrowsers []Browser) model.Submi
 	log.Printf("Found %d history database(s)", len(dbs))
 
 	for _, entry := range dbs {
-		visits, indicators := scanDB(ctx, entry.browser, entry.path, entry.user, cutoff)
+		dbCutoff := cutoff
+		if t, ok := cfg.DBCutoffs[entry.path]; ok && t.After(dbCutoff) {
+			dbCutoff = t
+		}
+		visits, indicators := scanDB(ctx, entry.browser, entry.path, entry.user, dbCutoff)
 		sub.Visits = append(sub.Visits, visits...)
 		sub.IncognitoIndicators = append(sub.IncognitoIndicators, indicators...)
 	}

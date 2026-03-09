@@ -127,24 +127,28 @@ func main() {
 	}
 }
 
+// lastScanState tracks per-DB-path latest visit times so each browser DB
+// gets its own lookback window. If a DB was locked on the previous scan,
+// the next scan reaches back to its last successful time.
 type lastScanState struct {
-	LastVisit time.Time `json:"last_visit"`
+	// DBs maps DB file paths to the latest visit time seen from that DB.
+	DBs map[string]time.Time `json:"dbs"`
 }
 
-func loadLastScan(spoolDir string) (time.Time, bool) {
+func loadLastScan(spoolDir string) lastScanState {
 	data, err := os.ReadFile(filepath.Join(spoolDir, "last_scan.json"))
 	if err != nil {
-		return time.Time{}, false
+		return lastScanState{}
 	}
 	var state lastScanState
 	if err := json.Unmarshal(data, &state); err != nil {
-		return time.Time{}, false
+		return lastScanState{}
 	}
-	return state.LastVisit, !state.LastVisit.IsZero()
+	return state
 }
 
-func saveLastScan(spoolDir string, t time.Time) {
-	data, err := json.Marshal(lastScanState{LastVisit: t})
+func saveLastScan(spoolDir string, state lastScanState) {
+	data, err := json.Marshal(state)
 	if err != nil {
 		log.Printf("Failed to marshal last_scan: %v", err)
 		return
@@ -158,14 +162,15 @@ func saveLastScan(spoolDir string, t time.Time) {
 	}
 }
 
-func latestVisitTime(sub *model.Submission) time.Time {
-	var latest time.Time
+// latestVisitPerDB returns the latest visit time for each DB path.
+func latestVisitPerDB(sub *model.Submission) map[string]time.Time {
+	m := make(map[string]time.Time)
 	for _, v := range sub.Visits {
-		if v.Time.After(latest) {
-			latest = v.Time
+		if v.Time.After(m[v.DBPath]) {
+			m[v.DBPath] = v.Time
 		}
 	}
-	return latest
+	return m
 }
 
 func runDaemon(ctx context.Context, serverURL, hostname string, lookback time.Duration, interval time.Duration, apiKey string, spoolDir string, client *http.Client, autoUpdate bool) {
@@ -179,17 +184,11 @@ func runDaemon(ctx context.Context, serverURL, hostname string, lookback time.Du
 
 		scanCtx, scanCancel := context.WithTimeout(ctx, 5*time.Minute)
 
-		effectiveLookback := lookback
-		if lastVisit, ok := loadLastScan(spoolDir); ok {
-			sinceLastVisit := time.Since(lastVisit)
-			if sinceLastVisit < lookback {
-				effectiveLookback = sinceLastVisit
-				log.Printf("Narrowing lookback to %s based on last scan", effectiveLookback)
-			}
-		}
+		lastState := loadLastScan(spoolDir)
 
 		cfg := app.Config{
-			Lookback: effectiveLookback,
+			Lookback:  lookback,
+			DBCutoffs: lastState.DBs,
 		}
 
 		all := browsers.All()
@@ -210,8 +209,15 @@ func runDaemon(ctx context.Context, serverURL, hostname string, lookback time.Du
 			}
 		} else {
 			log.Printf("Submission uploaded successfully")
-			if latest := latestVisitTime(&sub); !latest.IsZero() {
-				saveLastScan(spoolDir, latest)
+			perDB := latestVisitPerDB(&sub)
+			if len(perDB) > 0 {
+				if lastState.DBs == nil {
+					lastState.DBs = make(map[string]time.Time)
+				}
+				for db, t := range perDB {
+					lastState.DBs[db] = t
+				}
+				saveLastScan(spoolDir, lastState)
 			}
 		}
 

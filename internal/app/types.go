@@ -10,8 +10,9 @@ import (
 // Config holds runtime configuration parsed from CLI flags.
 type Config struct {
 	Lookback    time.Duration
-	Format      string   // "json" or "text"
-	DBOverrides []string // explicit DB paths to scan instead of auto-discovery
+	Format      string            // "json" or "text"
+	DBOverrides []string          // explicit DB paths to scan instead of auto-discovery
+	DBCutoffs   map[string]time.Time // per-DB-path cutoff overrides (from last successful scan)
 }
 
 // Duration is a flag.Value that extends time.ParseDuration with "d" and "w" units.
