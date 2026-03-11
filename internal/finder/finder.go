@@ -38,18 +38,59 @@ func expandHome(path string) string {
 	return filepath.Join(home, path[1:])
 }
 
-// UserDirs returns home directories to scan. On Windows with admin privileges
-// it attempts to enumerate user profile directories. On macOS it returns the
-// current user's home.
+// UserDirs returns home directories to scan. On Windows and macOS it
+// enumerates user profile directories so that a service running as root
+// can discover all users' browser history. On other platforms it falls
+// back to the current user's home.
 func UserDirs() []string {
-	if runtime.GOOS == "windows" {
+	switch runtime.GOOS {
+	case "windows":
 		return windowsUserDirs()
+	case "darwin":
+		return darwinUserDirs()
+	default:
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil
+		}
+		return []string{home}
 	}
-	home, err := os.UserHomeDir()
+}
+
+func darwinUserDirs() []string {
+	entries, err := os.ReadDir("/Users")
 	if err != nil {
-		return nil
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil
+		}
+		return []string{home}
 	}
-	return []string{home}
+
+	skip := map[string]bool{
+		"shared": true,
+		"guest":  true,
+	}
+
+	var dirs []string
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		name := strings.ToLower(e.Name())
+		if skip[name] || strings.HasPrefix(name, ".") {
+			continue
+		}
+		dirs = append(dirs, filepath.Join("/Users", e.Name()))
+	}
+	if len(dirs) == 0 {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil
+		}
+		return []string{home}
+	}
+	return dirs
 }
 
 func windowsUserDirs() []string {
