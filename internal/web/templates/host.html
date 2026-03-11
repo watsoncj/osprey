@@ -12,6 +12,8 @@
     <dt>Total Visits</dt><dd>{{.Stats.TotalVisits}}</dd>
     <dt>Flagged</dt><dd{{if gt .Stats.FlaggedVisits 0}} class="flagged"{{end}}>{{.Stats.FlaggedVisits}}</dd>
     <dt>Latest</dt><dd>{{if .Stats.LatestVisit.IsZero}}—{{else}}{{fmtTime .Stats.LatestVisit}}{{end}}</dd>
+    {{if .Stats.IPAddress}}<dt>IP Address</dt><dd>{{.Stats.IPAddress}}</dd>{{end}}
+    {{if .Stats.AgentVersion}}<dt>Agent Version</dt><dd>{{.Stats.AgentVersion}}</dd>{{end}}
   </dl>
   {{if .Incognito}}<p><a href="/hosts/{{.Hostname}}/incognito">{{len .Incognito}} incognito indicator(s)</a></p>{{end}}
 </div>

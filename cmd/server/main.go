@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -160,8 +161,12 @@ func handlePostVisits(s *store.Store, p *ingest.Pipeline, apiKey string) http.Ha
 			}
 		}
 
-		if sub.AgentVersion != "" {
-			if err := s.SaveHostMeta(hostname, sub.AgentVersion); err != nil {
+		ip := r.RemoteAddr
+		if host, _, err := net.SplitHostPort(ip); err == nil {
+			ip = host
+		}
+		if sub.AgentVersion != "" || ip != "" {
+			if err := s.SaveHostMeta(hostname, sub.AgentVersion, ip); err != nil {
 				log.Printf("save host meta error: %v", err)
 			}
 		}

@@ -29,6 +29,7 @@ type VisitQuery struct {
 type HostStats struct {
 	Hostname              string              `json:"hostname"`
 	AgentVersion          string              `json:"agent_version,omitempty"`
+	IPAddress             string              `json:"ip_address,omitempty"`
 	TotalVisits           int                 `json:"total_visits"`
 	FlaggedVisits         int                 `json:"flagged_visits"`
 	DismissedFlaggedVisits int               `json:"dismissed_flagged_visits,omitempty"`
@@ -41,6 +42,7 @@ type HostStats struct {
 // HostMeta holds per-host metadata persisted to meta.json.
 type HostMeta struct {
 	AgentVersion string    `json:"agent_version"`
+	IPAddress    string    `json:"ip_address,omitempty"`
 	LastSeen     time.Time `json:"last_seen"`
 }
 
@@ -50,13 +52,14 @@ func VisitKey(url string, t time.Time, browser string) string {
 }
 
 // SaveHostMeta writes agent metadata for a hostname.
-func (s *Store) SaveHostMeta(hostname, agentVersion string) error {
+func (s *Store) SaveHostMeta(hostname, agentVersion, ipAddress string) error {
 	dir := filepath.Join(s.Dir, hostname)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("create dir: %w", err)
 	}
 	meta := HostMeta{
 		AgentVersion: agentVersion,
+		IPAddress:    ipAddress,
 		LastSeen:     time.Now().UTC(),
 	}
 	data, err := json.Marshal(meta)
@@ -313,6 +316,7 @@ func (s *Store) HostStats(hostname string) (HostStats, error) {
 
 	if meta, err := s.LoadHostMeta(hostname); err == nil {
 		stats.AgentVersion = meta.AgentVersion
+		stats.IPAddress = meta.IPAddress
 	}
 
 	visits, err := s.LoadVisits(hostname, VisitQuery{ShowDismissed: true})
