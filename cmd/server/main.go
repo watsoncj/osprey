@@ -331,7 +331,7 @@ func handlePost(s *store.Store, p *ingest.Pipeline, apiKey string) http.HandlerF
 			}
 			for _, ind := range db.IncognitoIndicators {
 				rawIncognito = append(rawIncognito, model.RawIncognitoIndicator{
-					URL: ind.URL, Browser: ind.Browser, DBPath: ind.DBPath,
+					URL: ind.URL, Browser: ind.Browser, DBPath: ind.DBPath, User: ind.User,
 				})
 			}
 		}

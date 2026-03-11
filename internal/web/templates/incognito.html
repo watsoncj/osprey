@@ -10,12 +10,32 @@
 <h1>Incognito Indicators — {{.Hostname}}</h1>
 <p>URLs found in Favicons DB but absent from History ({{len .Indicators}} total)</p>
 
+<form class="filter-bar" method="get" action="/hosts/{{.Hostname}}/incognito">
+  {{if .Users}}
+  <select name="user" onchange="this.form.submit()">
+    <option value="">All users</option>
+    {{range .Users}}
+    <option value="{{.}}"{{if eq $.User .}} selected{{end}}>{{.}}</option>
+    {{end}}
+  </select>
+  {{end}}
+  {{if .Browsers}}
+  <select name="browser" onchange="this.form.submit()">
+    <option value="">All browsers</option>
+    {{range .Browsers}}
+    <option value="{{.}}"{{if eq $.Browser .}} selected{{end}}>{{.}}</option>
+    {{end}}
+  </select>
+  {{end}}
+</form>
+
 {{if .Indicators}}
 <table class="data-table">
   <thead>
     <tr>
       <th>URL</th>
       <th>Browser</th>
+      <th>User</th>
       <th>Decoded Data</th>
     </tr>
   </thead>
@@ -24,6 +44,7 @@
     <tr>
       <td class="url-cell">{{truncate .URL 80}}</td>
       <td>{{.Browser}}</td>
+      <td>{{.User}}</td>
       <td>
         {{range .Decoded}}
         {{$decoder := .Decoder}}
