@@ -121,6 +121,10 @@ type visitWithHost struct {
 type incognitoData struct {
 	Hostname   string
 	Indicators []model.IncognitoIndicator
+	Browser    string
+	User       string
+	Browsers   []string
+	Users      []string
 }
 
 // Handler returns an http.Handler with all web UI routes.
@@ -327,8 +331,40 @@ func handleDismissWeb(s *store.Store) http.HandlerFunc {
 func handleIncognito(s *store.Store) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		hostname := r.PathValue("hostname")
+		q := r.URL.Query()
+		browser := q.Get("browser")
+		user := q.Get("user")
 
-		indicators, err := s.LoadIncognito(hostname)
+		// Load all indicators to extract available browsers/users for filter dropdowns.
+		all, err := s.LoadIncognito(hostname)
+		if err != nil {
+			log.Printf("error loading incognito for %s: %v", hostname, err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+
+		browserSet := make(map[string]bool)
+		userSet := make(map[string]bool)
+		for _, ind := range all {
+			if ind.Browser != "" {
+				browserSet[ind.Browser] = true
+			}
+			if ind.User != "" {
+				userSet[ind.User] = true
+			}
+		}
+		var browsers, users []string
+		for b := range browserSet {
+			browsers = append(browsers, b)
+		}
+		for u := range userSet {
+			users = append(users, u)
+		}
+		sort.Strings(browsers)
+		sort.Strings(users)
+
+		// Apply filters.
+		indicators, err := s.LoadIncognito(hostname, store.IncognitoQuery{Browser: browser, User: user})
 		if err != nil {
 			log.Printf("error loading incognito for %s: %v", hostname, err)
 			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -339,6 +375,10 @@ func handleIncognito(s *store.Store) http.HandlerFunc {
 		if err := incognitoTmpl.ExecuteTemplate(w, "layout", incognitoData{
 			Hostname:   hostname,
 			Indicators: indicators,
+			Browser:    browser,
+			User:       user,
+			Browsers:   browsers,
+			Users:      users,
 		}); err != nil {
 			log.Printf("error executing incognito template: %v", err)
 		}

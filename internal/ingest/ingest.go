@@ -47,6 +47,7 @@ func (p *Pipeline) ProcessIncognito(raw []model.RawIncognitoIndicator) []model.I
 			URL:     r.URL,
 			Browser: r.Browser,
 			DBPath:  r.DBPath,
+			User:    r.User,
 			Decoded: p.decoders.DecodeAll(r.URL),
 		}
 	}

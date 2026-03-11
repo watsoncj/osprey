@@ -146,7 +146,7 @@ func (s *Store) AppendIncognito(hostname string, indicators []model.IncognitoInd
 
 	count := 0
 	for _, ind := range indicators {
-		key := fmt.Sprintf("%s|%s", ind.URL, ind.Browser)
+		key := fmt.Sprintf("%s|%s|%s", ind.URL, ind.Browser, ind.User)
 		if existing[key] {
 			continue
 		}
@@ -304,10 +304,39 @@ func (s *Store) LoadVisits(hostname string, q VisitQuery) ([]model.Visit, error)
 	return filtered, nil
 }
 
-// LoadIncognito reads all incognito indicators for a hostname.
-func (s *Store) LoadIncognito(hostname string) ([]model.IncognitoIndicator, error) {
+// IncognitoQuery holds optional filters for loading incognito indicators.
+type IncognitoQuery struct {
+	Browser string
+	User    string
+}
+
+// LoadIncognito reads incognito indicators for a hostname, optionally filtered.
+func (s *Store) LoadIncognito(hostname string, q ...IncognitoQuery) ([]model.IncognitoIndicator, error) {
 	path := filepath.Join(s.Dir, hostname, "incognito.jsonl")
-	return readJSONL[model.IncognitoIndicator](path)
+	indicators, err := readJSONL[model.IncognitoIndicator](path)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(q) == 0 {
+		return indicators, nil
+	}
+	f := q[0]
+	if f.Browser == "" && f.User == "" {
+		return indicators, nil
+	}
+
+	var filtered []model.IncognitoIndicator
+	for _, ind := range indicators {
+		if f.Browser != "" && ind.Browser != f.Browser {
+			continue
+		}
+		if f.User != "" && ind.User != f.User {
+			continue
+		}
+		filtered = append(filtered, ind)
+	}
+	return filtered, nil
 }
 
 // HostStats computes aggregate statistics for a hostname's visits.
@@ -442,7 +471,7 @@ func loadIncognitoKeys(path string) (map[string]bool, error) {
 	}
 	keys := make(map[string]bool, len(indicators))
 	for _, ind := range indicators {
-		key := fmt.Sprintf("%s|%s", ind.URL, ind.Browser)
+		key := fmt.Sprintf("%s|%s|%s", ind.URL, ind.Browser, ind.User)
 		keys[key] = true
 	}
 	return keys, nil

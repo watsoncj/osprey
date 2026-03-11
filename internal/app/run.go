@@ -91,7 +91,7 @@ func processDB(ctx context.Context, b Browser, path string, cutoff time.Time, de
 	}
 	defer db.Close()
 
-	visits, err := b.Query(ctx, db, cutoff)
+	visits, err := b.Query(ctx, db.DB, cutoff)
 	if err != nil {
 		dbr.Error = fmt.Sprintf("query failed: %v", err)
 		return dbr

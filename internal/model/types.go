@@ -36,6 +36,7 @@ type IncognitoIndicator struct {
 	URL     string       `json:"url"`
 	Browser string       `json:"browser"`
 	DBPath  string       `json:"db_path"` // path to the Favicons DB
+	User    string       `json:"user,omitempty"`
 	Decoded []DecodedURL `json:"decoded,omitempty"`
 }
 
@@ -88,6 +89,7 @@ type RawIncognitoIndicator struct {
 	URL     string `json:"url"`
 	Browser string `json:"browser"`
 	DBPath  string `json:"db_path"`
+	User    string `json:"user,omitempty"`
 }
 
 // Submission is the payload the agent sends to the server.

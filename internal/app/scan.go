@@ -75,11 +75,13 @@ func scanDB(ctx context.Context, b Browser, path, user string, cutoff time.Time)
 	}
 	defer db.Close()
 
-	visits, err := b.Query(ctx, db, cutoff)
+	visits, err := b.Query(ctx, db.DB, cutoff)
 	if err != nil {
 		log.Printf("Query failed for %s: %v", path, err)
 		return nil, nil
 	}
+
+	log.Printf("Found %d visit(s) in %s", len(visits), path)
 
 	raw := make([]model.RawVisit, len(visits))
 	for i, v := range visits {
@@ -93,12 +95,12 @@ func scanDB(ctx context.Context, b Browser, path, user string, cutoff time.Time)
 		}
 	}
 
-	indicators := scanIncognito(ctx, path, b.Name())
+	indicators := scanIncognito(ctx, path, b.Name(), user)
 	return raw, indicators
 }
 
 // scanIncognito queries the Favicons DB for page_urls without decoding.
-func scanIncognito(ctx context.Context, historyPath string, browserName string) []model.RawIncognitoIndicator {
+func scanIncognito(ctx context.Context, historyPath string, browserName string, user string) []model.RawIncognitoIndicator {
 	if !chromiumBrowsers[browserName] {
 		return nil
 	}
@@ -133,6 +135,7 @@ func scanIncognito(ctx context.Context, historyPath string, browserName string) 
 			URL:     u,
 			Browser: browserName,
 			DBPath:  faviconPath,
+			User:    user,
 		})
 	}
 	if err := rows.Err(); err != nil {
